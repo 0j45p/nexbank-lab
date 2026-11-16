@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}NexBank NetBanking{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+
+<nav class="navbar" id="main-nav" style="display:none">
+  <div class="navbar-top">
+    <a href="/" class="nav-brand">
+      <div class="nav-logo">🏦</div>
+      <div class="nav-brand-text">
+        <span class="nav-brand-name">NexBank</span>
+        <span class="nav-brand-tag">Internet Banking</span>
+      </div>
+    </a>
+    <div class="nav-center">
+      <a href="/dashboard"    class="nav-link"><span class="icon">🏠</span> Home</a>
+      <a href="/transactions" class="nav-link"><span class="icon">📄</span> Statements</a>
+      <a href="/transfer"     class="nav-link"><span class="icon">💸</span> Transfer</a>
+      <a href="/profile"      class="nav-link"><span class="icon">👤</span> Profile</a>
+    </div>
+    <div class="nav-right">
+      <div class="nav-user-pill" id="nav-user-pill">
+        <div class="nav-avatar" id="nav-avatar">?</div>
+        <div>
+          <div class="nav-user-name" id="nav-user-name">User</div>
+          <div class="nav-user-role" id="nav-user-role">Customer</div>
+        </div>
+      </div>
+      <button class="btn-nav-logout" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+</nav>
+
+<div class="alert" id="alert-box"></div>
+
+<main class="main-content">{% block content %}{% endblock %}</main>
+
+<footer class="footer">
+  <p><strong>NexBank Digital Banking</strong> &nbsp;|&nbsp; Regulated by Reserve Bank of India &nbsp;|&nbsp; DICGC insured up to ₹5 Lakh &nbsp;|&nbsp; CIN: U65191MH2024PLC999999</p>
+  <p style="margin-top:5px">© 2024 NexBank Pvt. Ltd. All rights reserved. &nbsp;|&nbsp; <a href="#" style="color:rgba(255,255,255,.5)">Privacy Policy</a> &nbsp;|&nbsp; <a href="#" style="color:rgba(255,255,255,.5)">Terms of Use</a></p>
+</footer>
+
+<!-- Trainer Mode toggle (subtle, for instructors) -->
+<button class="trainer-toggle" id="trainer-toggle" title="Trainer Panel" style="display:none" onclick="toggleTrainer()">🎓</button>
+<div class="trainer-panel hidden" id="trainer-panel">
+  <div class="trainer-panel-header">
+    <span>🎓 Trainer Notes</span>
+    <button onclick="toggleTrainer()" style="background:none;border:none;color:#a8b8c8;cursor:pointer;font-size:16px">✕</button>
+  </div>
+  <div class="trainer-panel-body">
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 1</div>
+      <div class="trainer-lab-name">Account Takeover — Full Chain</div>
+      <div class="trainer-vuln">IDOR + Password Reset Logic Flaw + OTP Bypass</div>
+      <span class="trainer-endpoint">GET /api/account/user/{id}/profile</span>
+      <span class="trainer-endpoint">POST /api/auth/reset-password {"user_id": X}</span>
+      <span class="trainer-endpoint">POST /api/auth/verify-otp {"otp_bypass": true}</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 2</div>
+      <div class="trainer-lab-name">OTP Authentication Bypass</div>
+      <div class="trainer-vuln">X-Debug-OTP header leak · otp_bypass param · X-Forwarded-For rate limit spoof</div>
+      <span class="trainer-endpoint">POST /api/auth/send-otp → header X-Debug-OTP</span>
+      <span class="trainer-endpoint">POST /api/auth/verify-otp {"otp_bypass": true}</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 3</div>
+      <div class="trainer-lab-name">Predictable Reset Token + Host Injection</div>
+      <div class="trainer-vuln">MD5(email + floor(time/60) + salt) · X-Forwarded-Host hijack</div>
+      <span class="trainer-endpoint">POST /api/auth/forgot-password</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 4</div>
+      <div class="trainer-lab-name">Session Fixation</div>
+      <div class="trainer-vuln">Server reuses client-supplied session_id cookie on login</div>
+      <span class="trainer-endpoint">POST /api/auth/login (set session_id cookie first)</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 5</div>
+      <div class="trainer-lab-name">2FA Step-Skip via Cookie Forgery</div>
+      <div class="trainer-vuln">auth_step=2, auth_user_id=X — no HMAC, client-controlled</div>
+      <span class="trainer-endpoint">Set cookies → POST /api/auth/login</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 6</div>
+      <div class="trainer-lab-name">Hardcoded AES Key in JS</div>
+      <div class="trainer-vuln">Key: NexBankSecure2024, IV: 1234567890123456 — in app.js</div>
+      <span class="trainer-endpoint">POST /api/txn/transfer {"enc_payload": ...}</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 7</div>
+      <div class="trainer-lab-name">MD5 Passwords (No Salt)</div>
+      <div class="trainer-vuln">hashlib.md5(password.encode()).hexdigest() — no salt</div>
+      <span class="trainer-endpoint">GET /debug/users → password_hash</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 8</div>
+      <div class="trainer-lab-name">IDOR — Account &amp; Transaction Enumeration</div>
+      <div class="trainer-vuln">No ownership check on /api/account or /api/txn</div>
+      <span class="trainer-endpoint">GET /api/txn/{1..10} · GET /api/account/user/{1..5}/profile</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 9</div>
+      <div class="trainer-lab-name">JWT — alg:none + Weak Secret</div>
+      <div class="trainer-vuln">verify_signature=False · alg:none accepted · secret=nexbank2024</div>
+      <span class="trainer-endpoint">POST /api/auth/forge-token</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 10</div>
+      <div class="trainer-lab-name">Stored XSS — Transaction Description</div>
+      <div class="trainer-vuln">Raw innerHTML concat in dashboard.html + transactions.html, no escaping</div>
+      <span class="trainer-endpoint">POST /api/txn/transfer {"description": "&lt;img onerror=...&gt;"}</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 11</div>
+      <div class="trainer-lab-name">Path Traversal — Statement Download</div>
+      <div class="trainer-vuln">os.path.join() discards the base dir on an absolute path; normpath() never re-checks containment</div>
+      <span class="trainer-endpoint">GET /api/account/statement/download?file=/etc/passwd (or ../config.py to leak secrets)</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 12</div>
+      <div class="trainer-lab-name">SSRF -&gt; LFI — Receipt PDF Letterhead</div>
+      <div class="trainer-vuln">logo_url scheme is never checked — http(s):// is SSRF, file:// is straight local file read</div>
+      <span class="trainer-endpoint">GET /api/account/receipt/download?logo_url=file:///etc/passwd (or http://redis:6379/)</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 13</div>
+      <div class="trainer-lab-name">Hidden Endpoint via Leaked Swagger</div>
+      <div class="trainer-vuln">/api/admin/impersonate/{id} — no role check, unlinked in UI</div>
+      <span class="trainer-endpoint">GET /api/openapi.json → POST /api/admin/impersonate/5</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 14</div>
+      <div class="trainer-lab-name">Supply Chain Risk — Exposed package.json</div>
+      <div class="trainer-vuln">Known-CVE deps + unclaimed @nexbank-internal/* scope (dependency confusion)</div>
+      <span class="trainer-endpoint">GET /static/package.json</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 15</div>
+      <div class="trainer-lab-name">XXE — Bulk Transfer Batch Upload</div>
+      <div class="trainer-vuln">lxml XMLParser(resolve_entities=True, no_network=False) — reflected, not blind</div>
+      <span class="trainer-endpoint">POST /api/txn/bulk-upload — &lt;!ENTITY xxe SYSTEM "file:///etc/passwd"&gt;</span>
+    </div>
+    <div class="trainer-lab">
+      <div class="trainer-lab-num">Lab 16</div>
+      <div class="trainer-lab-name">Privilege Escalation — Role Management</div>
+      <div class="trainer-vuln">Self-service upgrade + unguarded admin role endpoint, no allow-list either way</div>
+      <span class="trainer-endpoint">POST /api/account/request-role-upgrade {"requested_role":"admin"}</span>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+(function() {
+  var tok = getToken();
+  if (tok) {
+    var pl = decodeJWT(tok);
+    if (pl && pl.name) {
+      document.getElementById('main-nav').style.display = '';
+      document.getElementById('nav-avatar').textContent    = pl.name.charAt(0).toUpperCase();
+      document.getElementById('nav-user-name').textContent = pl.name;
+      document.getElementById('nav-user-role').textContent = pl.role === 'admin' ? 'Administrator' : 'NetBanking Customer';
+      document.getElementById('trainer-toggle').style.display = 'flex';
+    }
+  }
+})();
+
+function doLogout() {
+  fetch('/api/auth/logout', { method: 'POST', headers: authHeaders() })
+    .finally(function() {
+      localStorage.removeItem('nexbank_token');
+      ['auth_token','session_id','auth_step','auth_user_id'].forEach(function(c) {
+        document.cookie = c + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      });
+      window.location = '/login';
+    });
+}
+
+function toggleTrainer() {
+  document.getElementById('trainer-panel').classList.toggle('hidden');
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password — NexBank NetBanking</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+
+<div class="alert" id="alert-box"></div>
+
+<div class="auth-page">
+
+  <!-- Left panel -->
+  <div class="auth-left">
+    <div class="auth-left-logo">
+      <div class="logo-box">🏦</div>
+      <span class="logo-name">NexBank</span>
+    </div>
+    <h1>Reset Your<br>Password</h1>
+    <p>Enter your registered email address and we'll send you a secure link to reset your NetBanking password.</p>
+    <div class="auth-feature">
+      <div class="auth-feature-icon">🔒</div>
+      <div class="auth-feature-text">
+        <strong>Secure Reset Process</strong>
+        <span>Time-limited link valid for 15 minutes only</span>
+      </div>
+    </div>
+    <div class="auth-feature">
+      <div class="auth-feature-icon">📧</div>
+      <div class="auth-feature-text">
+        <strong>Email Verification</strong>
+        <span>Link sent to your registered email address</span>
+      </div>
+    </div>
+    <div class="auth-feature">
+      <div class="auth-feature-icon">🛡️</div>
+      <div class="auth-feature-text">
+        <strong>Account Protected</strong>
+        <span>All sessions will be invalidated on reset</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="auth-right">
+    <div class="auth-form-header">
+      <div class="bank-logo">
+        <div class="bank-logo-img">🏦</div>
+        <span class="bank-logo-name">NexBank</span>
+      </div>
+      <h2>Forgot Password?</h2>
+      <p>No worries — enter your registered email to receive a reset link.</p>
+    </div>
+
+    <!-- Step 1: Request reset -->
+    <div id="step-request">
+      <div class="form-group">
+        <label class="form-label">Registered Email Address</label>
+        <input type="email" id="reset-email" class="form-input" placeholder="e.g. arjun@email.com" autocomplete="email">
+      </div>
+      <button class="btn btn-primary btn-block" onclick="requestReset()">Send Reset Link</button>
+      <div class="auth-links" style="margin-top:16px">
+        <a href="/login">← Back to Login</a>
+        <a href="#">Need help?</a>
+      </div>
+    </div>
+
+    <!-- Step 2: Link sent confirmation -->
+    <div id="step-sent" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:48px;margin-bottom:16px">📧</div>
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px">Check your email</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.7">
+        A password reset link has been sent to<br>
+        <strong id="sent-to-email"></strong>.<br>
+        The link is valid for 15 minutes.
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 16px;text-align:left;margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Reset Link (dev mode)</div>
+        <div style="font-family:var(--mono);font-size:11.5px;color:var(--primary);word-break:break-all" id="reset-link-display"></div>
+      </div>
+      <button class="btn btn-outline btn-block" onclick="goToReset()">Enter Reset Token</button>
+      <div style="margin-top:12px;font-size:12.5px;color:var(--text3)">
+        Didn't receive it? <a href="#" onclick="document.getElementById('step-request').style.display='block';document.getElementById('step-sent').style.display='none'; return false">Try again</a>
+      </div>
+    </div>
+
+    <!-- Step 3: Enter new password -->
+    <div id="step-reset" style="display:none">
+      <div style="background:var(--info-bg);border:1px solid #bdd7f0;border-radius:6px;padding:10px 14px;font-size:12.5px;color:var(--info);margin-bottom:16px">
+        🔑 Enter the reset token from your email and choose a new password.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reset Token</label>
+        <input type="text" id="reset-token" class="form-input" placeholder="Paste token from email" style="font-family:var(--mono);font-size:13px">
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Password</label>
+        <input type="password" id="new-password" class="form-input" placeholder="Minimum 8 characters">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm New Password</label>
+        <input type="password" id="confirm-password" class="form-input" placeholder="Re-enter new password">
+      </div>
+      <button class="btn btn-primary btn-block" onclick="doReset()">Reset Password</button>
+    </div>
+
+    <!-- Step 4: Success -->
+    <div id="step-success" style="display:none;text-align:center;padding:20px 0">
+      <div style="font-size:48px;margin-bottom:16px">✅</div>
+      <div style="font-size:17px;font-weight:700;color:var(--credit);margin-bottom:8px">Password Reset Successful</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:24px;line-height:1.7">
+        Your password has been updated. All existing sessions have been invalidated. Please login with your new password.
+      </div>
+      <a href="/login" class="btn btn-primary btn-block">Login Now</a>
+    </div>
+
+    <div class="security-note" style="margin-top:24px">
+      <span class="lock">🔒</span>
+      <span>If you did not request a password reset, please ignore this page. Your account remains secure. Contact support if you suspect unauthorized access.</span>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+var _resetToken = '';
+
+function requestReset() {
+  var email = document.getElementById('reset-email').value.trim();
+  if (!email) { showAlert('Enter your registered email address', 'error'); return; }
+
+  fetch('/api/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { showAlert(data.error, 'error'); return; }
+    _resetToken = data.token || '';
+    document.getElementById('sent-to-email').textContent     = email;
+    document.getElementById('reset-link-display').textContent = data.reset_link || '';
+    document.getElementById('reset-token').value             = _resetToken;
+    document.getElementById('step-request').style.display = 'none';
+    document.getElementById('step-sent').style.display    = 'block';
+  });
+}
+
+function goToReset() {
+  document.getElementById('step-sent').style.display  = 'none';
+  document.getElementById('step-reset').style.display = 'block';
+}
+
+function doReset() {
+  var token   = document.getElementById('reset-token').value.trim();
+  var newPass = document.getElementById('new-password').value;
+  var confirm = document.getElementById('confirm-password').value;
+  if (!token)   { showAlert('Enter the reset token', 'error'); return; }
+  if (!newPass) { showAlert('Enter a new password', 'error'); return; }
+  if (newPass !== confirm) { showAlert('Passwords do not match', 'error'); return; }
+
+  fetch('/api/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token, new_password: newPass })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { showAlert(data.error, 'error'); return; }
+    document.getElementById('step-reset').style.display   = 'none';
+    document.getElementById('step-success').style.display = 'block';
+  });
+}
+</script>
+</body>
+</html>

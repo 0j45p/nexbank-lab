@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — NexBank NetBanking</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+
+<div class="alert" id="alert-box"></div>
+
+<div class="auth-page">
+
+  <!-- Left panel — branding -->
+  <div class="auth-left">
+    <div class="auth-left-logo">
+      <div class="logo-box">🏦</div>
+      <span class="logo-name">NexBank</span>
+    </div>
+    <h1>Secure<br>Internet Banking</h1>
+    <p>Access your accounts, transfer funds, pay bills and manage your finances — all from one place, with bank-grade security.</p>
+    <div class="auth-feature">
+      <div class="auth-feature-icon">⚡</div>
+      <div class="auth-feature-text">
+        <strong>Instant IMPS Transfers</strong>
+        <span>Transfer money 24×7 to any account across India</span>
+      </div>
+    </div>
+    <div class="auth-feature">
+      <div class="auth-feature-icon">📄</div>
+      <div class="auth-feature-text">
+        <strong>Account Statements</strong>
+        <span>View and download up to 5 years of history</span>
+      </div>
+    </div>
+    <div class="auth-feature">
+      <div class="auth-feature-icon">🛡️</div>
+      <div class="auth-feature-text">
+        <strong>DICGC Insured</strong>
+        <span>Deposits insured up to ₹5 lakh per depositor</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel — login form -->
+  <div class="auth-right">
+    <div class="auth-form-header">
+      <div class="bank-logo">
+        <div class="bank-logo-img">🏦</div>
+        <span class="bank-logo-name">NexBank</span>
+      </div>
+      <h2>Welcome back</h2>
+      <p>Sign in to your NetBanking account</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-otp"  onclick="switchTab('otp')">OTP Login</button>
+      <button class="auth-tab"        id="tab-pass" onclick="switchTab('pass')">Password Login</button>
+    </div>
+
+    <!-- OTP tab -->
+    <div class="auth-tab-panel active" id="panel-otp">
+      <div id="otp-phase1">
+        <div class="form-group">
+          <label class="form-label">Registered Mobile Number</label>
+          <input id="otp-mobile" type="tel" class="form-input" placeholder="Enter 10-digit mobile number" maxlength="10" autocomplete="tel">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="doSendOTP()">Get OTP</button>
+      </div>
+
+      <div id="otp-phase2" style="display:none">
+        <div style="background:var(--info-bg);border:1px solid #bdd7f0;border-radius:6px;padding:10px 14px;font-size:12.5px;color:var(--info);margin-bottom:16px">
+          📱 OTP sent to <strong id="otp-sent-to"></strong>. Valid for 5 minutes.
+        </div>
+        <div class="form-group">
+          <label class="form-label">One Time Password</label>
+          <input id="otp-code" type="text" class="form-input" placeholder="Enter 6-digit OTP" maxlength="6" autocomplete="one-time-code">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="doVerifyOTP()">Verify &amp; Login</button>
+        <div style="text-align:center;margin-top:12px;font-size:12.5px;color:var(--text3)">
+          Didn't receive OTP? <a href="#" onclick="resetOTPPhase(); return false">Resend</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Password tab -->
+    <div class="auth-tab-panel" id="panel-pass">
+      <div id="pass-phase1">
+        <div class="form-group">
+          <label class="form-label">Mobile Number</label>
+          <input id="pass-mobile" type="tel" class="form-input" placeholder="Registered mobile number" maxlength="10">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Internet Banking Password</label>
+          <input id="pass-password" type="password" class="form-input" placeholder="Enter your password" autocomplete="current-password">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="doPasswordLogin()">Continue</button>
+      </div>
+
+      <div id="pass-phase2" style="display:none">
+        <div style="background:var(--info-bg);border:1px solid #bdd7f0;border-radius:6px;padding:10px 14px;font-size:12.5px;color:var(--info);margin-bottom:16px">
+          🔒 Two-factor authentication required. OTP sent to your registered mobile.
+        </div>
+        <div class="form-group">
+          <label class="form-label">One Time Password</label>
+          <input id="pass-otp" type="text" class="form-input" placeholder="Enter OTP" maxlength="6">
+        </div>
+        <button class="btn btn-primary btn-block" onclick="doPassword2FA()">Verify &amp; Login</button>
+      </div>
+    </div>
+
+    <div class="auth-links">
+      <a href="/forgot-password">Forgot Password?</a>
+      <a href="#">Register for NetBanking</a>
+    </div>
+
+    <div class="security-note">
+      <span class="lock">🔒</span>
+      <span>Your connection is encrypted with 256-bit SSL. NexBank will never ask for your full password or OTP over phone or email.</span>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+var _mobile = '';
+var _userId = null;
+
+function switchTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.auth-tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+}
+
+function doSendOTP() {
+  _mobile = document.getElementById('otp-mobile').value.trim();
+  if (_mobile.length < 10) { showAlert('Enter a valid 10-digit mobile number', 'error'); return; }
+  sendOTP(_mobile).then(function(data) {
+    if (data.error) { showAlert(data.error, 'error'); return; }
+    document.getElementById('otp-sent-to').textContent = _mobile.replace(/(\d{2})\d{6}(\d{2})/, '$1XXXXXX$2');
+    document.getElementById('otp-phase1').style.display = 'none';
+    document.getElementById('otp-phase2').style.display = 'block';
+  });
+}
+
+function resetOTPPhase() {
+  document.getElementById('otp-phase1').style.display = 'block';
+  document.getElementById('otp-phase2').style.display = 'none';
+  document.getElementById('otp-code').value = '';
+}
+
+function doVerifyOTP() {
+  var otp = document.getElementById('otp-code').value.trim();
+  if (!otp) { showAlert('Enter the OTP', 'error'); return; }
+  verifyOTP(_mobile, otp, false).then(function(data) {
+    if (data.error) { showAlert(data.error, 'error'); return; }
+    _userId = data.user_id;
+    completeLogin();
+  });
+}
+
+function doPasswordLogin() {
+  var mob  = document.getElementById('pass-mobile').value.trim();
+  var pass = document.getElementById('pass-password').value;
+  if (!mob || !pass) { showAlert('Enter mobile number and password', 'error'); return; }
+  fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mobile: mob, password: pass })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { showAlert(data.error, 'error'); return; }
+    _mobile = mob;
+    _userId = data.user_id;
+    sendOTP(mob);
+    document.getElementById('pass-phase1').style.display = 'none';
+    document.getElementById('pass-phase2').style.display = 'block';
+  });
+}
+
+function doPassword2FA() {
+  var otp = document.getElementById('pass-otp').value.trim();
+  verifyOTP(_mobile, otp, false).then(function(data) {
+    if (data.error) { showAlert(data.error, 'error'); return; }
+    completeLogin();
+  });
+}
+
+function completeLogin() {
+  fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ otp_verified: true, user_id: _userId })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { showAlert(data.error, 'error'); return; }
+    localStorage.setItem('nexbank_token', data.token);
+    showAlert('Login successful. Redirecting…', 'success');
+    setTimeout(function() { window.location = '/dashboard'; }, 700);
+  });
+}
+</script>
+</body>
+</html>

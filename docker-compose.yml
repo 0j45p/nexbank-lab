@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: nexbank-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./app/static:/var/www/static:ro
+      - ./app/uploads:/var/www/uploads
+    depends_on:
+      - app
+    networks:
+      - nexbank-network
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: nexbank-app
+    environment:
+      - FLASK_APP=app.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://nexbank:nexbank123@db:5432/nexbank
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=super_secret_flask_key_123
+      - JWT_SECRET=nexbank2024
+      - JWT_ALGORITHM=HS256
+      - AES_KEY=NexBankSecure2024
+      - AES_IV=1234567890123456
+      - RESET_TOKEN_SALT=nexbank_static_salt
+    volumes:
+      - ./app:/app
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - nexbank-network
+    restart: unless-stopped
+
+  db:
+    image: postgres:15-alpine
+    container_name: nexbank-db
+    environment:
+      - POSTGRES_USER=nexbank
+      - POSTGRES_PASSWORD=nexbank123
+      - POSTGRES_DB=nexbank
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexbank -d nexbank"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - nexbank-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: nexbank-redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - nexbank-network
+    restart: unless-stopped
+
+networks:
+  nexbank-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:

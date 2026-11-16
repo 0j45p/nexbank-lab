@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Account Statement — NexBank NetBanking{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-breadcrumb"><a href="/dashboard">Home</a> / <span style="color:#fff">Account Statement</span></div>
+    <h2>Account Statement</h2>
+  </div>
+</div>
+
+<div class="page-content">
+
+  <!-- Filter bar -->
+  <div class="card mb24">
+    <div class="card-body" style="padding:16px 20px">
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="form-group" style="margin-bottom:0;flex:1;min-width:160px">
+          <label class="form-label">Account</label>
+          <select class="form-select" id="filter-account" onchange="loadStatement()">
+            <option value="">All Accounts</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px">
+          <label class="form-label">Transaction Type</label>
+          <select class="form-select" id="filter-type" onchange="loadStatement()">
+            <option value="">All</option>
+            <option value="debit">Debit</option>
+            <option value="credit">Credit</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;flex:1;min-width:140px">
+          <label class="form-label">Period</label>
+          <select class="form-select" id="filter-period" onchange="loadStatement()">
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 3 months</option>
+            <option value="180">Last 6 months</option>
+            <option value="365">Last 1 year</option>
+            <option value="all" selected>All time</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="loadStatement()">View Statement</button>
+        <button class="btn btn-outline" onclick="downloadCSV()">⬇ Download CSV</button>
+        <button class="btn btn-outline" onclick="downloadStatementFile()">⬇ Statement PDF</button>
+        <button class="btn btn-outline" onclick="downloadReceipt()">⬇ Receipt PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statement summary chips -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px" id="stmt-summary">
+    <div class="stat-chip">
+      <div class="stat-icon blue">📋</div>
+      <div><div class="stat-label">Total Transactions</div><div class="stat-value" id="s-total">—</div></div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-icon green">📥</div>
+      <div><div class="stat-label">Total Credits</div><div class="stat-value" id="s-credit" style="color:var(--credit)">—</div></div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-icon" style="background:var(--debit-bg)">📤</div>
+      <div><div class="stat-label">Total Debits</div><div class="stat-value" id="s-debit" style="color:var(--debit)">—</div></div>
+    </div>
+  </div>
+
+  <!-- Statement table -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Transaction History</div>
+        <div class="card-subtitle" id="stmt-range">All transactions</div>
+      </div>
+    </div>
+    <div class="txn-list" id="txn-list">
+      <div style="padding:40px;text-align:center;color:var(--text3)">Loading…</div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+var _allTxns = [];
+var _myAccounts = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (!getToken()) { window.location = '/login'; return; }
+  loadMyAccounts().then(function() { loadStatement(); });
+});
+
+function loadMyAccounts() {
+  return fetch('/api/account/my-accounts', { headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _myAccounts = data.accounts || [];
+      var sel = document.getElementById('filter-account');
+      _myAccounts.forEach(function(a) {
+        var opt = document.createElement('option');
+        opt.value = a.id;
+        opt.textContent = a.account_number + ' (' + a.account_type + ')';
+        sel.appendChild(opt);
+      });
+    });
+}
+
+function loadStatement() {
+  fetch('/api/txn/all', { headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _allTxns = data.transactions || [];
+      renderStatement();
+    });
+}
+
+function renderStatement() {
+  var acctFilter   = document.getElementById('filter-account').value;
+  var typeFilter   = document.getElementById('filter-type').value;
+  var periodFilter = document.getElementById('filter-period').value;
+  var cutoff = periodFilter === 'all' ? null : new Date(Date.now() - parseInt(periodFilter) * 86400000);
+
+  var txns = _allTxns.filter(function(t) {
+    if (acctFilter) {
+      var id = parseInt(acctFilter);
+      if (t.from_account_id !== id && t.to_account_id !== id) return false;
+    }
+    if (cutoff && t.created_at && new Date(t.created_at) < cutoff) return false;
+    if (typeFilter === 'debit'  && t.from_account_id === null) return false;
+    if (typeFilter === 'credit' && t.from_account_id !== null) return false;
+    return true;
+  });
+
+  var totalCredit = 0, totalDebit = 0;
+  txns.forEach(function(t) {
+    if (t.from_account_id) totalDebit += parseFloat(t.amount);
+    else totalCredit += parseFloat(t.amount);
+  });
+
+  document.getElementById('s-total').textContent  = txns.length;
+  document.getElementById('s-credit').textContent = '₹' + totalCredit.toLocaleString('en-IN', {maximumFractionDigits:0});
+  document.getElementById('s-debit').textContent  = '₹' + totalDebit.toLocaleString('en-IN', {maximumFractionDigits:0});
+  document.getElementById('stmt-range').textContent = txns.length + ' transactions';
+
+  var icons = { 0:'💸', 1:'🛒', 2:'🏠', 3:'📱', 4:'🍽️', 5:'✈️', 6:'💊', 7:'🎓', 8:'🏥', 9:'⚡' };
+  var el = document.getElementById('txn-list');
+  if (!txns.length) {
+    el.innerHTML = '<div style="padding:48px;text-align:center;color:var(--text3);font-size:14px">No transactions found for the selected filters.</div>';
+    return;
+  }
+
+  // Lab 9: Stored XSS — same unescaped concat as dashboard.html. description
+  // is 100% attacker-controlled (routes/txn.py transfer()), stored as-is,
+  // and rendered here via raw innerHTML — no encoding anywhere in the chain.
+  el.innerHTML = txns.map(function(t, i) {
+    var isDebit = t.from_account_id !== null;
+    var cls     = isDebit ? 'debit' : 'credit';
+    var sign    = isDebit ? '−' : '+';
+    var icon    = icons[i % 10];
+    var date    = t.created_at ? new Date(t.created_at) : new Date();
+    var dateStr = date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    var timeStr = date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    return '<div class="txn-row">' +
+      '<div class="txn-icon ' + cls + '">' + icon + '</div>' +
+      '<div class="txn-details">' +
+        '<div class="txn-desc">' + (t.description || 'Fund Transfer') + '</div>' +
+        '<div class="txn-meta">' + dateStr + ', ' + timeStr + ' &nbsp;·&nbsp; <span class="txn-id-pill">' + t.txn_id + '</span> &nbsp;·&nbsp; ' + (isDebit ? 'Debit' : 'Credit') + '</div>' +
+      '</div>' +
+      '<div class="txn-amount">' +
+        '<div class="amount ' + cls + '">' + sign + ' ₹' + parseFloat(t.amount).toLocaleString('en-IN', {minimumFractionDigits:2}) + '</div>' +
+        '<div class="balance"><span class="txn-status-badge badge-' + (t.status || 'completed') + '">' + (t.status || 'Completed') + '</span></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function downloadStatementFile() {
+  // Lab 10: `file` is passed straight through to the server, which joins it
+  // onto a directory with no traversal check — see routes/account.py.
+  // Like the rest of the app, this is AES-encrypted before it goes on the
+  // wire (same key/IV as Lab 5) — decrypt/edit/re-encrypt it with
+  // tools/burp_nexbank_decryptor.py to see or change what's actually inside.
+  // Relies on the auth_token cookie (set at login) since this is a plain
+  // navigation, not a fetch() — no Authorization header to attach.
+  var file = prompt('Statement file name:', 'statement_sample.txt');
+  if (!file) return;
+  var encPayload = aesEncrypt(JSON.stringify({ file: file }));
+  window.location = '/api/account/statement/download?enc_payload=' + encodeURIComponent(encPayload);
+}
+
+function downloadReceipt() {
+  // Lab 11: `logo_url` is fetched server-side and embedded into the PDF with
+  // no allow-list — see routes/account.py receipt_download(). Encrypted the
+  // same way as everywhere else in the app.
+  var txnId = prompt('Transaction ID for receipt:', 'TXN-00001');
+  if (!txnId) return;
+  var logoUrl = prompt('Letterhead logo URL (leave blank for none):', '');
+  var encPayload = aesEncrypt(JSON.stringify({ txn_id: txnId, logo_url: logoUrl || '' }));
+  window.location = '/api/account/receipt/download?enc_payload=' + encodeURIComponent(encPayload);
+}
+
+function downloadCSV() {
+  var rows = [['Date','Transaction ID','Description','Type','Amount','Status']];
+  _allTxns.forEach(function(t) {
+    var isDebit = t.from_account_id !== null;
+    var date = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN') : '';
+    rows.push([date, t.txn_id, t.description || '', isDebit ? 'Debit' : 'Credit', t.amount, t.status || 'completed']);
+  });
+  var csv = rows.map(function(r) { return r.map(function(c) { return '"' + c + '"'; }).join(','); }).join('\n');
+  var a = document.createElement('a');
+  a.href = 'data:text/csv,' + encodeURIComponent(csv);
+  a.download = 'NexBank_Statement.csv';
+  a.click();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# Environment & Secrets
+.env
+*.local
+
+# Database / Docker volumes & temp uploads
+app/uploads/*
+!app/uploads/.gitkeep
+postgres_data/
+redis_data/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*~

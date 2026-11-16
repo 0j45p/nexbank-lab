@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+{% block title %}Lab 2 — IDOR — NexBank{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-breadcrumb"><a href="/">Labs</a> / <span style="color:#fff">Lab 2</span></div>
+    <h2>Lab 2 — IDOR: Fetch Any Profile &amp; Statement</h2>
+  </div>
+</div>
+
+<div class="page-content">
+
+  <div class="ato-objective">
+    <div class="obj-icon">🎯</div>
+    <div class="obj-text">
+      <strong>Objective:</strong> You are logged in as <em>Arjun Mehta</em> (user_id: <code style="color:var(--primary)">1</code>).
+      Exploit IDOR to read <em>Priya Nair's</em> profile (PAN, Aadhaar, password hash)
+      and then pull her complete transaction statement — without any authorization error.
+    </div>
+  </div>
+
+  <div class="ato-steps">
+
+    <!-- Part 1: IDOR Profile -->
+    <div class="ato-step" id="step-1">
+      <div class="step-header">
+        <div class="step-num">01</div>
+        <div class="step-info">
+          <div class="step-title">IDOR — Fetch Another User's Profile</div>
+          <div class="step-vuln">Flaw: <code>GET /api/account/user/{user_id}/profile</code> — no ownership check, user_id is attacker-controlled</div>
+        </div>
+        <div class="step-status" id="s1-status">⬜</div>
+      </div>
+      <div class="step-body">
+        <p>
+          The profile endpoint returns PAN number, Aadhaar, password hash and KYC details for <em>any</em> user_id.
+          The server checks only that a JWT is present — it never verifies the JWT's <code>user_id</code> matches the requested resource.
+        </p>
+
+        <div style="background:#f0f4f8;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;margin-bottom:12px">
+<span style="color:#888">GET</span> /api/account/user/<span style="color:var(--debit);font-weight:700">{user_id}</span>/profile<br>
+Authorization: Bearer &lt;your_token&gt;<br><br>
+<span style="color:#888"># Try user_id = 1 (you), then 2, 3, 4 …</span>
+        </div>
+
+        <div class="input-row">
+          <label class="form-label" style="flex-shrink:0">Target user_id</label>
+          <input type="number" id="p1-uid" class="form-input" value="2" min="1" max="10" style="width:120px;flex:none">
+          <button class="btn btn-primary" onclick="p1FetchProfile()">Fetch Profile (IDOR)</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('p1-uid').value=1;p1FetchProfile()">User 1 (you)</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('p1-uid').value=2;p1FetchProfile()">User 2 (Priya)</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('p1-uid').value=3;p1FetchProfile()">User 3 (Rohan)</button>
+          </div>
+        </div>
+        <pre id="p1-result" class="result-box"></pre>
+
+        <div id="p1-found" style="display:none;margin-top:12px">
+          <div style="background:var(--debit-bg);border:1px solid #f5c2c0;border-radius:6px;padding:12px 16px;font-size:13px;color:var(--debit)">
+            <div style="font-weight:700;margin-bottom:8px">🚨 Sensitive data exposed via IDOR</div>
+            <div class="info-row" style="border:none;padding:4px 0"><div class="info-label" style="width:140px">Name</div><div class="info-value" id="p1-name">—</div></div>
+            <div class="info-row" style="border:none;padding:4px 0"><div class="info-label" style="width:140px">Mobile</div><div class="info-value mono" id="p1-mobile">—</div></div>
+            <div class="info-row" style="border:none;padding:4px 0"><div class="info-label" style="width:140px">Email</div><div class="info-value" id="p1-email">—</div></div>
+            <div class="info-row" style="border:none;padding:4px 0"><div class="info-label" style="width:140px">PAN Number</div><div class="info-value mono" id="p1-pan" style="color:var(--debit);font-weight:700">—</div></div>
+            <div class="info-row" style="border:none;padding:4px 0"><div class="info-label" style="width:140px">Aadhaar</div><div class="info-value mono" id="p1-aadhaar" style="color:var(--debit);font-weight:700">—</div></div>
+            <div class="info-row" style="border:none;padding:4px 0"><div class="info-label" style="width:140px">Password Hash (MD5)</div><div class="info-value mono" id="p1-hash" style="color:var(--debit);font-weight:700;word-break:break-all">—</div></div>
+          </div>
+        </div>
+
+        <div id="p1-why" style="display:none;margin-top:12px;padding:12px 14px;background:#f0f4f8;border-radius:6px;font-size:12.5px">
+          <strong>Root cause:</strong> In <code>account.py → get_user_profile(user_id)</code>, the server only calls
+          <code>@require_auth</code> to check token validity — it never compares <code>g.current_user.id</code> against
+          the requested <code>user_id</code>. The fix: add <code>if g.current_user.id != user_id and g.current_user.role != 'admin': abort(403)</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Part 2: IDOR Statement -->
+    <div class="ato-step" id="step-2">
+      <div class="step-header">
+        <div class="step-num">02</div>
+        <div class="step-info">
+          <div class="step-title">IDOR — Fetch Another User's Account Statement</div>
+          <div class="step-vuln">Flaw: <code>GET /api/txn/by-account/{account_id}</code> — no ownership check, account_id is attacker-controlled</div>
+        </div>
+        <div class="step-status" id="s2-status">⬜</div>
+      </div>
+      <div class="step-body">
+        <p>
+          The statement endpoint returns the full transaction history for any account ID.
+          Enumerate account IDs sequentially — there is no check that the account belongs to the authenticated user.
+        </p>
+
+        <div style="background:#f0f4f8;border:1px solid var(--border);border-radius:6px;padding:12px 14px;font-family:var(--mono);font-size:12.5px;margin-bottom:12px">
+<span style="color:#888">GET</span> /api/txn/by-account/<span style="color:var(--debit);font-weight:700">{account_id}</span><br>
+Authorization: Bearer &lt;your_token&gt;<br><br>
+<span style="color:#888"># Enumerate 1, 2, 3 … to find accounts belonging to other users</span>
+        </div>
+
+        <p style="font-size:12.5px;color:var(--text2);margin-bottom:10px">
+          First, see your own accounts (account IDs exposed in dashboard response), then try other IDs.
+        </p>
+
+        <div class="input-row">
+          <label class="form-label" style="flex-shrink:0">Target account_id</label>
+          <input type="number" id="p2-aid" class="form-input" value="3" min="1" max="10" style="width:120px;flex:none">
+          <button class="btn btn-primary" onclick="p2FetchStatement()">Fetch Statement (IDOR)</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" onclick="p2FindMyAccounts()">List my accounts first</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('p2-aid').value=3;p2FetchStatement()">Account 3</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('p2-aid').value=4;p2FetchStatement()">Account 4</button>
+          </div>
+        </div>
+        <pre id="p2-my-accounts" class="result-box" style="display:none"></pre>
+        <pre id="p2-result" class="result-box"></pre>
+
+        <div id="p2-found" style="display:none;margin-top:12px">
+          <div style="background:var(--debit-bg);border:1px solid #f5c2c0;border-radius:6px;padding:12px 16px;font-size:13px">
+            <div style="font-weight:700;color:var(--debit);margin-bottom:10px">🚨 Another user's transaction statement exposed via IDOR</div>
+            <table style="width:100%;border-collapse:collapse;font-size:12px" id="p2-txn-table">
+              <thead>
+                <tr style="background:#f5c2c0">
+                  <th style="padding:6px 10px;text-align:left">Txn ID</th>
+                  <th style="padding:6px 10px;text-align:left">Type</th>
+                  <th style="padding:6px 10px;text-align:right">Amount (₹)</th>
+                  <th style="padding:6px 10px;text-align:left">Description</th>
+                  <th style="padding:6px 10px;text-align:left">Date</th>
+                </tr>
+              </thead>
+              <tbody id="p2-txn-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="p2-why" style="display:none;margin-top:12px;padding:12px 14px;background:#f0f4f8;border-radius:6px;font-size:12.5px">
+          <strong>Root cause:</strong> In <code>txn.py → transactions_by_account(account_id)</code>, the server queries
+          transactions by <code>account_id</code> without verifying the account belongs to <code>g.current_user</code>.
+          Fix: lookup <code>BankAccount.query.filter_by(id=account_id, user_id=g.current_user.id).first_or_404()</code>
+          before querying transactions.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Completion -->
+  <div id="lab2-complete" class="ato-complete-box" style="display:none;margin-top:20px">
+    <div class="complete-icon">✅</div>
+    <h3>Lab 2 Complete</h3>
+    <p>You exploited <strong>IDOR on two endpoints</strong>:</p>
+    <ol>
+      <li><strong>Profile IDOR</strong> — <code>/api/account/user/{id}/profile</code> leaked PAN, Aadhaar, and MD5 password hash for any user</li>
+      <li><strong>Statement IDOR</strong> — <code>/api/txn/by-account/{id}</code> leaked complete transaction history for any account</li>
+    </ol>
+    <p style="margin-top:8px;font-size:13px;color:var(--text2)">Both flaws stem from the same root cause: authentication without authorization — the server verifies who you are but never checks what you're allowed to access.</p>
+    <a href="/" class="btn btn-primary" style="margin-top:12px">Back to Labs →</a>
+  </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (!getToken()) {
+    document.querySelector('.ato-steps').insertAdjacentHTML('beforebegin',
+      '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#856404">' +
+      '🔐 <strong>Login required.</strong> &nbsp;<a href="/login" style="color:#0044aa;font-weight:600">Login first →</a></div>'
+    );
+  }
+});
+
+var _done = {1:false, 2:false};
+function markDone(n) {
+  _done[n] = true;
+  document.getElementById('s'+n+'-status').textContent = '✅';
+  if (_done[1] && _done[2]) document.getElementById('lab2-complete').style.display = 'block';
+}
+
+/* ── Part 1: Profile IDOR ── */
+function p1FetchProfile() {
+  var uid = document.getElementById('p1-uid').value;
+  fetch('/api/account/user/' + uid + '/profile', { headers: authHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      document.getElementById('p1-result').textContent = JSON.stringify(d, null, 2);
+      if (d.user) {
+        var u = d.user;
+        document.getElementById('p1-name').textContent    = u.name    || '—';
+        document.getElementById('p1-mobile').textContent  = u.mobile  || '—';
+        document.getElementById('p1-email').textContent   = u.email   || '—';
+        document.getElementById('p1-pan').textContent     = u.pan_number     || '— (not set)';
+        document.getElementById('p1-aadhaar').textContent = u.aadhaar_number || '— (not set)';
+        document.getElementById('p1-hash').textContent    = u.password_hash  || '— (hidden)';
+        document.getElementById('p1-found').style.display = 'block';
+        document.getElementById('p1-why').style.display   = 'block';
+        var currentUid = (function(){
+          try { return JSON.parse(atob(getToken().split('.')[1])).user_id; } catch(e) { return null; }
+        })();
+        if (parseInt(uid) !== parseInt(currentUid)) {
+          showAlert('IDOR! Accessed user #' + uid + ' profile with your token', 'error');
+          markDone(1);
+        } else {
+          showAlert('That is your own profile — try a different user_id', 'info');
+        }
+      } else {
+        showAlert(d.error || 'No user found', 'error');
+        document.getElementById('p1-found').style.display = 'none';
+      }
+    });
+}
+
+/* ── Part 2: Statement IDOR ── */
+function p2FindMyAccounts() {
+  fetch('/api/account/my-accounts', { headers: authHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var el = document.getElementById('p2-my-accounts');
+      el.style.display = 'block';
+      if (d.accounts) {
+        el.textContent = 'Your accounts:\n' + d.accounts.map(function(a){
+          return '  account_id=' + a.id + '  number=' + a.account_number + '  balance=₹' + a.balance;
+        }).join('\n') + '\n\nNow try other account IDs to see IDOR…';
+      } else {
+        el.textContent = JSON.stringify(d, null, 2);
+      }
+    });
+}
+
+function p2FetchStatement() {
+  var aid = document.getElementById('p2-aid').value;
+  fetch('/api/txn/by-account/' + aid, { headers: authHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      document.getElementById('p2-result').textContent = JSON.stringify(d, null, 2);
+      if (d.transactions && d.transactions.length > 0) {
+        var tbody = document.getElementById('p2-txn-body');
+        tbody.innerHTML = d.transactions.map(function(t){
+          var dt = t.created_at ? t.created_at.split('T')[0] : '—';
+          var amt = '₹' + (parseFloat(t.amount)||0).toLocaleString('en-IN', {minimumFractionDigits:2});
+          return '<tr style="border-bottom:1px solid #f5c2c0">' +
+            '<td style="padding:5px 10px;font-family:var(--mono);font-size:11px">' + (t.txn_id||t.id) + '</td>' +
+            '<td style="padding:5px 10px">' + (t.txn_type||'—') + '</td>' +
+            '<td style="padding:5px 10px;text-align:right;font-weight:600">' + amt + '</td>' +
+            '<td style="padding:5px 10px;color:var(--text2)">' + (t.description||'—') + '</td>' +
+            '<td style="padding:5px 10px;font-size:11px">' + dt + '</td></tr>';
+        }).join('');
+        document.getElementById('p2-found').style.display = 'block';
+        document.getElementById('p2-why').style.display   = 'block';
+        showAlert('IDOR! Fetched ' + d.transactions.length + ' transactions for account #' + aid, 'error');
+        markDone(2);
+      } else if (d.transactions && d.transactions.length === 0) {
+        document.getElementById('p2-result').textContent = 'Account ' + aid + ' exists but has no transactions. Try another account_id.';
+        document.getElementById('p2-found').style.display = 'none';
+      } else {
+        showAlert(d.error || 'Not found', 'error');
+        document.getElementById('p2-found').style.display = 'none';
+      }
+    });
+}
+</script>
+{% endblock %}

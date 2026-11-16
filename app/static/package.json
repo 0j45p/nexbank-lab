@@ -1,0 +1,27 @@
+{
+  "name": "nexbank-frontend-admin-tools",
+  "version": "2.4.1",
+  "private": true,
+  "description": "Internal admin tooling bundle for NexBank NetBanking — build artifact left in static/ by mistake",
+  "scripts": {
+    "build": "webpack --config webpack.internal.js",
+    "deploy": "node scripts/deploy-internal.js"
+  },
+  "dependencies": {
+    "axios": "0.21.0",
+    "lodash": "4.17.15",
+    "jquery": "3.4.1",
+    "jsonwebtoken": "8.5.1",
+    "minimist": "1.2.5",
+    "crypto-js": "4.1.1",
+    "@nexbank-internal/otp-widget": "^2.1.0",
+    "@nexbank-internal/kyc-uploader": "^1.0.3"
+  },
+  "publishConfig": {
+    "registry": "https://npm-internal.nexbank.local/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@git-internal.nexbank.local/platform/frontend-admin-tools.git"
+  }
+}

@@ -1,0 +1,6 @@
+NexBank Digital — Account Statement (Sample)
+==============================================
+This is a placeholder statement file served by the /api/account/statement/download
+endpoint (Lab 10: Path Traversal). Real statements would be generated per-account
+and stored here; the download endpoint's `file` parameter is not sanitized against
+directory traversal.

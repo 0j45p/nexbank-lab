@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Profile & KYC — NexBank NetBanking{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-breadcrumb"><a href="/dashboard">Home</a> / <span style="color:#fff">Profile &amp; KYC</span></div>
+    <h2>My Profile</h2>
+  </div>
+</div>
+
+<div class="page-content">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+
+    <!-- Profile overview -->
+    <div style="grid-column:span 2">
+      <div class="profile-header">
+        <div class="profile-avatar" id="prof-avatar">?</div>
+        <div>
+          <div class="profile-name" id="prof-name">Loading…</div>
+          <div class="profile-role" id="prof-role"></div>
+          <div id="prof-kyc-badge" style="margin-top:6px"></div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:12px;color:var(--text3);margin-bottom:4px">Customer ID</div>
+          <div style="font-family:var(--mono);font-size:14px;font-weight:700" id="prof-code">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Personal details -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Personal Information</div>
+        <button class="btn btn-outline btn-sm" onclick="toggleEdit()">✏️ Edit</button>
+      </div>
+      <div class="card-body">
+        <div id="info-display">
+          <div class="info-row"><div class="info-label">Full Name</div><div class="info-value" id="d-name">—</div></div>
+          <div class="info-row"><div class="info-label">Email Address</div><div class="info-value" id="d-email">—</div></div>
+          <div class="info-row"><div class="info-label">Mobile Number</div><div class="info-value mono" id="d-mobile">—</div></div>
+          <div class="info-row"><div class="info-label">Account Status</div><div class="info-value" id="d-verified">—</div></div>
+        </div>
+        <div id="edit-form" style="display:none;margin-top:12px">
+          <div class="form-group"><label class="form-label">Full Name</label><input type="text" id="e-name" class="form-input"></div>
+          <div class="form-group"><label class="form-label">Email Address</label><input type="email" id="e-email" class="form-input"></div>
+          <div class="form-group"><label class="form-label">Mobile Number</label><input type="tel" id="e-mobile" class="form-input"></div>
+          <div class="btn-row">
+            <button class="btn btn-outline" onclick="toggleEdit()">Cancel</button>
+            <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KYC -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">KYC Documents</div></div>
+      <div class="card-body">
+        <div class="info-row"><div class="info-label">KYC Status</div><div class="info-value" id="d-kyc">—</div></div>
+        <div class="info-row"><div class="info-label">PAN Number</div><div class="info-value mono" id="d-pan">—</div></div>
+        <div class="info-row"><div class="info-label">Aadhaar Number</div><div class="info-value mono" id="d-aadhaar">—</div></div>
+        <div style="margin-top:16px;padding:10px 14px;background:var(--warn-bg);border:1px solid #f5d87e;border-radius:6px;font-size:12.5px;color:var(--warn)">
+          ⚠️ PAN and Aadhaar are partially masked for security. Visit a branch to update KYC documents.
+        </div>
+      </div>
+    </div>
+
+    <!-- Linked accounts -->
+    <div class="card" style="grid-column:span 2">
+      <div class="card-header"><div class="card-title">Linked Bank Accounts</div></div>
+      <div class="card-body">
+        <div class="accounts-row" id="linked-accounts"><div style="color:var(--text3);font-size:13px">Loading…</div></div>
+      </div>
+    </div>
+
+    <!-- Account tier upgrade -->
+    <div class="card" style="grid-column:span 2">
+      <div class="card-header"><div class="card-title">Account Tier Upgrade</div></div>
+      <div class="card-body">
+        <div class="form-hint" style="margin-bottom:10px">Request an upgraded account tier (e.g. Premium, Corporate, NRI) — approved instantly, no manual review needed.</div>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <div class="form-group" style="margin-bottom:0;flex:1;min-width:200px">
+            <label class="form-label">Requested Tier</label>
+            <input type="text" id="tier-request" class="form-input" placeholder="e.g. premium, corporate, nri" value="premium">
+          </div>
+          <button class="btn btn-primary" onclick="requestTierUpgrade()">Submit Request</button>
+        </div>
+        <div id="tier-result" style="display:none;margin-top:12px;padding:10px 14px;border-radius:6px;font-size:13px"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (!getToken()) { window.location = '/login'; return; }
+  var pl = decodeJWT(getToken());
+  if (pl) loadProfile(pl.user_id);
+});
+
+function loadProfile(userId) {
+  fetch('/api/account/user/' + userId + '/profile', { headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var u = data.user; if (!u) return;
+      document.getElementById('prof-avatar').textContent = u.name ? u.name.charAt(0) : '?';
+      document.getElementById('prof-name').textContent   = u.name || '—';
+      document.getElementById('prof-role').textContent   = u.role === 'admin' ? 'Administrator' : 'NetBanking Customer';
+      document.getElementById('prof-code').textContent   = u.user_code || '—';
+      document.getElementById('prof-kyc-badge').innerHTML = u.kyc_status === 'Verified'
+        ? '<span class="kyc-badge kyc-verified">✓ KYC Verified</span>'
+        : '<span class="kyc-badge kyc-pending">⏳ KYC Pending</span>';
+      document.getElementById('d-name').textContent   = u.name || '—';
+      document.getElementById('d-email').textContent  = u.email || '—';
+      document.getElementById('d-mobile').textContent = u.mobile ? u.mobile.replace(/(\d{2})\d{6}(\d{2})/, '$1XXXXXX$2') : '—';
+      document.getElementById('d-verified').innerHTML = u.is_verified
+        ? '<span style="color:var(--credit);font-weight:600">✓ Active</span>'
+        : '<span style="color:var(--warn);font-weight:600">⏳ Pending Verification</span>';
+      document.getElementById('d-kyc').innerHTML = u.kyc_status === 'Verified'
+        ? '<span style="color:var(--credit);font-weight:600">✓ Verified</span>'
+        : '<span style="color:var(--warn);font-weight:600">⏳ ' + (u.kyc_status || 'Pending') + '</span>';
+      var pan  = u.pan_number || ''; document.getElementById('d-pan').textContent     = pan  ? pan.slice(0,2) + 'XXXXXXX' + pan.slice(-1)   : '—';
+      var aadh = u.aadhaar_number || ''; document.getElementById('d-aadhaar').textContent = aadh ? 'XXXX XXXX ' + aadh.slice(-4) : '—';
+      document.getElementById('e-name').value   = u.name   || '';
+      document.getElementById('e-email').value  = u.email  || '';
+      document.getElementById('e-mobile').value = u.mobile || '';
+    });
+
+  fetch('/api/account/my-accounts', { headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var c = document.getElementById('linked-accounts');
+      if (!data.accounts || !data.accounts.length) { c.innerHTML = '<span style="color:var(--text3);font-size:13px">No accounts.</span>'; return; }
+      c.innerHTML = data.accounts.map(function(a) {
+        var cls    = a.account_type === 'current' ? 'current' : 'savings';
+        var masked = a.account_number.replace(/^(\w{3})(.+)(\w{4})$/, '$1 XXXX XXXX $3');
+        return '<div class="acct-card ' + cls + '" style="min-height:120px">' +
+          '<div class="acct-type-label">' + a.account_type.toUpperCase() + '</div>' +
+          '<div class="acct-number">' + masked + '</div>' +
+          '<div class="acct-balance">₹ ' + a.balance.toLocaleString('en-IN',{minimumFractionDigits:2}) + '</div>' +
+          '<div class="acct-bal-label">Available Balance</div></div>';
+      }).join('');
+    });
+}
+
+function toggleEdit() {
+  var show = document.getElementById('edit-form').style.display === 'none';
+  document.getElementById('info-display').style.display = show ? 'none' : '';
+  document.getElementById('edit-form').style.display    = show ? 'block' : 'none';
+}
+
+function requestTierUpgrade() {
+  // Lab 15: `requested_role` is applied immediately server-side with no
+  // allow-list check — see routes/account.py request_role_upgrade().
+  // Typing "admin" here works exactly the same as typing "premium".
+  // AES-encrypted like everywhere else in the app (Lab 5 key/IV).
+  var tier = document.getElementById('tier-request').value.trim();
+  if (!tier) return;
+  var encPayload = aesEncrypt(JSON.stringify({ requested_role: tier }));
+  fetch('/api/account/request-role-upgrade', {
+    method: 'POST', headers: authHeaders(),
+    body: JSON.stringify({ enc_payload: encPayload })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var el = document.getElementById('tier-result');
+    el.style.display = 'block';
+    if (data.error) {
+      el.style.background = '#fde8e8'; el.style.color = '#c0392b';
+      el.textContent = data.error;
+    } else {
+      el.style.background = 'var(--info-bg)'; el.style.color = 'var(--info)';
+      el.textContent = data.message + '  (old: ' + data.old_role + ' -> new: ' + data.new_role + ')';
+      var pl = decodeJWT(getToken());
+      if (pl) loadProfile(pl.user_id);  // refresh the role badge at the top of the page
+    }
+  });
+}
+
+function saveProfile() {
+  // AES-CBC encrypt profile fields before PUT.
+  // Encryption key is NEXBANK_AES_KEY in /static/js/app.js — visible to anyone.
+  var profileData = JSON.stringify({
+    name:   document.getElementById('e-name').value.trim(),
+    email:  document.getElementById('e-email').value.trim(),
+    mobile: document.getElementById('e-mobile').value.trim()
+  });
+  fetch('/api/account/profile', {
+    method: 'PUT', headers: authHeaders(),
+    body: JSON.stringify({ enc_payload: aesEncrypt(profileData) })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { showAlert(data.error, 'error'); return; }
+    showAlert('Profile updated successfully', 'success');
+    toggleEdit();
+    var pl = decodeJWT(getToken());
+    if (pl) loadProfile(pl.user_id);
+  });
+}
+</script>
+{% endblock %}

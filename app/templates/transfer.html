@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% block title %}Fund Transfer — NexBank NetBanking{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-breadcrumb"><a href="/dashboard">Home</a> / <span style="color:#fff">Fund Transfer</span></div>
+    <h2>Fund Transfer</h2>
+  </div>
+</div>
+
+<div class="page-content">
+  <div class="transfer-grid">
+
+    <!-- Transfer form -->
+    <div style="display:flex;flex-direction:column;gap:20px">
+
+      <!-- Transfer type -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">Select Transfer Mode</div></div>
+        <div class="card-body">
+          <div class="transfer-type-tabs">
+            <button class="transfer-type-btn active" onclick="setMode(this,'IMPS')">
+              <div style="font-size:18px;margin-bottom:4px">⚡</div>
+              <div>IMPS</div>
+              <div style="font-size:10px;color:var(--text3);font-weight:400;margin-top:2px">Instant 24×7</div>
+            </button>
+            <button class="transfer-type-btn" onclick="setMode(this,'NEFT')">
+              <div style="font-size:18px;margin-bottom:4px">🏦</div>
+              <div>NEFT</div>
+              <div style="font-size:10px;color:var(--text3);font-weight:400;margin-top:2px">Mon–Sat</div>
+            </button>
+            <button class="transfer-type-btn" onclick="setMode(this,'RTGS')">
+              <div style="font-size:18px;margin-bottom:4px">🚀</div>
+              <div>RTGS</div>
+              <div style="font-size:10px;color:var(--text3);font-weight:400;margin-top:2px">₹2L+ only</div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Accounts -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">Transfer Details</div></div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">From Account</label>
+              <select class="form-select" id="from-account" onchange="updateFromBalance()">
+                <option value="">Select account</option>
+              </select>
+              <div class="form-hint" id="from-balance-hint"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">To Account Number</label>
+              <input type="text" id="to-account" class="form-input" placeholder="e.g. NXB1000000003" oninput="clearConfirm()">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Beneficiary Name</label>
+              <input type="text" id="ben-name" class="form-input" placeholder="Account holder name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">IFSC Code</label>
+              <input type="text" id="ifsc" class="form-input" value="NXBK0000001" placeholder="e.g. NXBK0000001">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Amount (₹)</label>
+            <input type="number" id="amount" class="form-input" placeholder="0.00" min="1" oninput="updatePreview()">
+            <div class="form-hint">Minimum ₹1 · Maximum ₹10,00,000 per transaction</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Remarks / Purpose</label>
+            <input type="text" id="remarks" class="form-input" placeholder="e.g. Rent payment, Family transfer…" maxlength="50">
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirm button -->
+      <div id="confirm-step" style="display:none">
+        <div class="card" style="border:2px solid var(--primary)">
+          <div class="card-header" style="background:#eef4ff">
+            <div class="card-title" style="color:var(--primary)">🔍 Confirm Transfer</div>
+          </div>
+          <div class="card-body">
+            <div class="transfer-summary" id="transfer-summary"></div>
+            <div style="margin-top:16px;display:flex;gap:10px">
+              <button class="btn btn-outline" onclick="cancelConfirm()">Cancel</button>
+              <button class="btn btn-primary" style="flex:1" onclick="doTransfer()">✓ Confirm &amp; Transfer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="proceed-btn-wrap">
+        <button class="btn btn-primary btn-block" style="padding:13px" onclick="showConfirm()">Proceed to Confirm</button>
+      </div>
+
+      <!-- Bulk transfer batch upload (NEFT/RTGS-style XML batch file) -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">Bulk Transfer Batch Upload</div></div>
+        <div class="card-body">
+          <div class="form-hint" style="margin-bottom:10px">Upload an XML batch file for NEFT/RTGS bulk transfers.</div>
+          <textarea id="bulk-xml" class="form-input" rows="6" style="font-family:var(--mono);font-size:12px" placeholder="&lt;BulkTransferBatch&gt;&#10;  &lt;Transfer&gt;&#10;    &lt;FromAccount&gt;NXB1000000001&lt;/FromAccount&gt;&#10;    &lt;ToAccount&gt;NXB1000000003&lt;/ToAccount&gt;&#10;    &lt;Amount&gt;500.00&lt;/Amount&gt;&#10;    &lt;Description&gt;Vendor payment&lt;/Description&gt;&#10;  &lt;/Transfer&gt;&#10;&lt;/BulkTransferBatch&gt;"></textarea>
+          <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="uploadBulkBatch()">Upload &amp; Parse Batch</button>
+          <pre id="bulk-result" style="display:none;margin-top:12px;background:var(--bg2,#f5f5f5);padding:10px;border-radius:6px;font-size:11px;white-space:pre-wrap;word-break:break-all"></pre>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right panel -->
+    <div style="display:flex;flex-direction:column;gap:20px">
+
+      <!-- Amount preview -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">Transfer Summary</div></div>
+        <div class="card-body">
+          <div class="amount-display">
+            <span class="currency">₹</span>
+            <span id="amount-preview">0.00</span>
+          </div>
+          <div class="transfer-summary" style="margin-top:12px">
+            <div class="summary-row"><span class="summary-label">Transfer Mode</span><span class="summary-value" id="s-mode">IMPS</span></div>
+            <div class="summary-row"><span class="summary-label">From</span><span class="summary-value mono" id="s-from">—</span></div>
+            <div class="summary-row"><span class="summary-label">To</span><span class="summary-value mono" id="s-to">—</span></div>
+            <div class="summary-row"><span class="summary-label">Beneficiary</span><span class="summary-value" id="s-ben">—</span></div>
+            <div class="summary-row"><span class="summary-label">Charges</span><span class="summary-value" style="color:var(--credit)">₹ 0.00</span></div>
+            <div class="summary-row" style="border-top:2px solid var(--border);padding-top:12px;margin-top:4px">
+              <span class="summary-label" style="font-weight:700;color:var(--text)">Total Debit</span>
+              <span class="summary-value" style="color:var(--primary);font-size:16px" id="s-total">₹ 0.00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transfer limits -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">Transfer Limits</div></div>
+        <div class="card-body">
+          <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+            <div style="display:flex;justify-content:space-between">
+              <span style="color:var(--text2)">IMPS per transaction</span>
+              <span style="font-weight:600">₹ 5,00,000</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <span style="color:var(--text2)">NEFT per day</span>
+              <span style="font-weight:600">₹ 10,00,000</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <span style="color:var(--text2)">RTGS minimum</span>
+              <span style="font-weight:600">₹ 2,00,000</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success result -->
+      <div class="card" id="result-card" style="display:none;border:2px solid var(--credit)">
+        <div class="card-body" style="text-align:center;padding:28px">
+          <div style="font-size:48px;margin-bottom:12px">✅</div>
+          <div style="font-size:16px;font-weight:700;color:var(--credit);margin-bottom:6px">Transfer Successful</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:14px" id="result-msg"></div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--text3)" id="result-txn-id"></div>
+          <button class="btn btn-outline btn-sm" style="margin-top:16px" onclick="resetForm()">New Transfer</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+var _mode = 'IMPS';
+var _accounts = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (!getToken()) { window.location = '/login'; return; }
+  fetch('/api/account/my-accounts', { headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _accounts = data.accounts || [];
+      var sel = document.getElementById('from-account');
+      _accounts.forEach(function(a) {
+        var opt = document.createElement('option');
+        opt.value = a.account_number;
+        opt.textContent = a.account_number + ' — ' + a.account_type + ' (₹' + a.balance.toLocaleString('en-IN') + ')';
+        sel.appendChild(opt);
+      });
+      if (_accounts.length) {
+        sel.value = _accounts[0].account_number;
+        updateFromBalance();
+      }
+    });
+});
+
+function setMode(el, mode) {
+  _mode = mode;
+  document.querySelectorAll('.transfer-type-btn').forEach(function(b) { b.classList.remove('active'); });
+  el.classList.add('active');
+  document.getElementById('s-mode').textContent = mode;
+}
+
+function updateFromBalance() {
+  var sel = document.getElementById('from-account');
+  var num = sel.value;
+  var acct = _accounts.find(function(a) { return a.account_number === num; });
+  var hint = document.getElementById('from-balance-hint');
+  if (acct) {
+    hint.textContent = 'Available balance: ₹' + acct.balance.toLocaleString('en-IN', {minimumFractionDigits:2});
+    document.getElementById('s-from').textContent = num;
+  }
+}
+
+function updatePreview() {
+  var amt = parseFloat(document.getElementById('amount').value) || 0;
+  document.getElementById('amount-preview').textContent = amt.toLocaleString('en-IN', {minimumFractionDigits:2});
+  document.getElementById('s-to').textContent  = document.getElementById('to-account').value || '—';
+  document.getElementById('s-ben').textContent = document.getElementById('ben-name').value  || '—';
+  document.getElementById('s-total').textContent = '₹ ' + amt.toLocaleString('en-IN', {minimumFractionDigits:2});
+}
+
+function clearConfirm() {
+  document.getElementById('confirm-step').style.display = 'none';
+  document.getElementById('proceed-btn-wrap').style.display = 'block';
+  updatePreview();
+}
+
+function showConfirm() {
+  var from = document.getElementById('from-account').value;
+  var to   = document.getElementById('to-account').value.trim();
+  var amt  = parseFloat(document.getElementById('amount').value);
+  var ben  = document.getElementById('ben-name').value.trim();
+  if (!from) { showAlert('Select a source account', 'error'); return; }
+  if (!to)   { showAlert('Enter beneficiary account number', 'error'); return; }
+  if (!amt || amt <= 0) { showAlert('Enter a valid amount', 'error'); return; }
+
+  document.getElementById('transfer-summary').innerHTML =
+    row('From Account', from) +
+    row('To Account', to) +
+    row('Beneficiary', ben || 'Not specified') +
+    row('IFSC', document.getElementById('ifsc').value || 'NXBK0000001') +
+    row('Amount', '₹ ' + amt.toLocaleString('en-IN', {minimumFractionDigits:2})) +
+    row('Mode', _mode) +
+    row('Remarks', document.getElementById('remarks').value || '—');
+
+  document.getElementById('confirm-step').style.display = 'block';
+  document.getElementById('proceed-btn-wrap').style.display = 'none';
+}
+
+function row(label, value) {
+  return '<div class="summary-row"><span class="summary-label">' + label + '</span><span class="summary-value">' + value + '</span></div>';
+}
+
+function cancelConfirm() {
+  document.getElementById('confirm-step').style.display = 'none';
+  document.getElementById('proceed-btn-wrap').style.display = 'block';
+}
+
+function doTransfer() {
+  var from    = document.getElementById('from-account').value;
+  var to      = document.getElementById('to-account').value.trim();
+  var amt     = parseFloat(document.getElementById('amount').value);
+  var remarks = document.getElementById('remarks').value.trim() || 'Fund Transfer';
+
+  var payload    = JSON.stringify({ from_account: from, to_account: to, amount: amt, description: remarks });
+  var encPayload = aesEncrypt(payload);
+
+  fetch('/api/txn/transfer', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ enc_payload: encPayload })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) { showAlert(data.error, 'error'); return; }
+    document.getElementById('result-msg').textContent =
+      '₹' + amt.toLocaleString('en-IN', {minimumFractionDigits:2}) + ' transferred to ' + to + ' via ' + _mode;
+    document.getElementById('result-txn-id').textContent = 'Reference: ' + data.txn_id;
+    document.getElementById('result-card').style.display = 'block';
+    document.getElementById('confirm-step').style.display = 'none';
+    showAlert('Transfer successful! Ref: ' + data.txn_id, 'success');
+  });
+}
+
+function uploadBulkBatch() {
+  // Lab 14: XML is parsed server-side with entity resolution enabled — see
+  // routes/txn.py bulk_upload(). Whatever a DOCTYPE-declared entity resolves
+  // to gets reflected straight back in the parsed_transfers response below.
+  // The whole XML body is AES-encrypted before it goes on the wire (same
+  // key/IV as everywhere else) — decrypt/edit/re-encrypt with
+  // tools/burp_nexbank_decryptor.py to see or modify the payload in transit.
+  var xml = document.getElementById('bulk-xml').value.trim();
+  if (!xml) { showAlert('Paste an XML batch first', 'error'); return; }
+  var encPayload = aesEncrypt(xml);
+
+  fetch('/api/txn/bulk-upload', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ enc_payload: encPayload })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var el = document.getElementById('bulk-result');
+    el.style.display = 'block';
+    el.textContent = JSON.stringify(data, null, 2);
+  });
+}
+
+function resetForm() {
+  document.getElementById('to-account').value = '';
+  document.getElementById('ben-name').value   = '';
+  document.getElementById('amount').value     = '';
+  document.getElementById('remarks').value    = '';
+  document.getElementById('result-card').style.display = 'none';
+  document.getElementById('proceed-btn-wrap').style.display = 'block';
+  document.getElementById('amount-preview').textContent = '0.00';
+  updateFromBalance();
+}
+</script>
+{% endblock %}

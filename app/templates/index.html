@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}NexBank — Secure Internet Banking{% endblock %}
+{% block content %}
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-tagline">Trusted by 2 Crore+ customers</div>
+    <h1>Banking that works<br>as hard as <span class="accent">you do</span></h1>
+    <p class="hero-sub">Secure, fast and convenient internet banking — transfer funds, pay bills, manage accounts and more, anytime from anywhere.</p>
+    <div class="hero-cta">
+      <a href="/login" class="btn btn-accent">Login to NetBanking</a>
+      <a href="#features" class="btn btn-outline" style="border-color:rgba(255,255,255,.4);color:#fff">Learn More</a>
+    </div>
+  </div>
+</section>
+
+<!-- Quick action strip -->
+<div class="quick-links">
+  <a href="/login" class="quick-link"><span class="ql-icon">💸</span>Fund Transfer</a>
+  <a href="/login" class="quick-link"><span class="ql-icon">📄</span>Account Statement</a>
+  <a href="/login" class="quick-link"><span class="ql-icon">💳</span>Cards</a>
+  <a href="/login" class="quick-link"><span class="ql-icon">🏠</span>Loans</a>
+  <a href="/login" class="quick-link"><span class="ql-icon">📱</span>Mobile Banking</a>
+  <a href="/login" class="quick-link"><span class="ql-icon">🔒</span>Fixed Deposits</a>
+</div>
+
+<!-- Features -->
+<section class="features-section" id="features">
+  <h2 style="font-size:24px;font-weight:800;margin-bottom:8px;text-align:center">Everything you need, in one place</h2>
+  <p style="text-align:center;color:var(--text2);margin-bottom:36px;font-size:14px">Manage your finances with confidence — secure, instant, paperless.</p>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <div class="feature-title">Instant IMPS Transfers</div>
+      <div class="feature-desc">Transfer funds 24×7 instantly to any bank account across India. No waiting, no delays.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <div class="feature-title">Multi-Factor Authentication</div>
+      <div class="feature-desc">Two-step login with OTP verification ensures only you can access your account.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <div class="feature-title">Account Insights</div>
+      <div class="feature-desc">View detailed statements, download PDFs and track your spending — all in one dashboard.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🏦</div>
+      <div class="feature-title">Multiple Accounts</div>
+      <div class="feature-desc">Savings, current and salary accounts — manage them all from a single login.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💼</div>
+      <div class="feature-title">Business Banking</div>
+      <div class="feature-desc">Current accounts, bulk transfers and GST-ready statements for small businesses.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📱</div>
+      <div class="feature-title">Mobile-Ready</div>
+      <div class="feature-desc">Full-featured banking on any device — desktop, tablet or smartphone.</div>
+    </div>
+  </div>
+</section>
+
+<!-- Lab Index -->
+<section style="background:var(--surface2);padding:40px 24px" id="labs">
+  <div style="max-width:1100px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div>
+        <div style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--debit);margin-bottom:4px">RedCIPHER Security Training</div>
+        <h2 style="font-size:22px;font-weight:800;margin:0">Lab Exercises</h2>
+      </div>
+      <div style="font-size:12.5px;color:var(--text3)">Login as Arjun (9100000001) to begin</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+
+      <a href="/lab1" style="text-decoration:none">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px;transition:box-shadow .15s;cursor:pointer" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow=''">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div style="background:#fff0f0;color:var(--debit);font-size:20px;width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center">🔑</div>
+            <div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)">Lab 1</div>
+              <div style="font-size:15px;font-weight:700;color:var(--text1)">OTP Authentication Bypass</div>
+            </div>
+          </div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">Exploit three different flaws to bypass OTP verification: debug header leak, bypass parameter, and rate-limit spoofing via X-Forwarded-For.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span style="background:#fff0f0;color:var(--debit);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600">Broken Auth</span>
+            <span style="background:#fff0f0;color:var(--debit);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600">OTP Bypass</span>
+            <span style="background:#fff0f0;color:var(--debit);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600">Rate Limit Bypass</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="/lab2" style="text-decoration:none">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px;transition:box-shadow .15s;cursor:pointer" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow=''">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div style="background:#fff0f0;color:var(--debit);font-size:20px;width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center">🔍</div>
+            <div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)">Lab 2</div>
+              <div style="font-size:15px;font-weight:700;color:var(--text1)">IDOR — Profile &amp; Statement</div>
+            </div>
+          </div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">Access any user's KYC profile (PAN, Aadhaar, password hash) and any account's full transaction statement by changing IDs in the API request.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span style="background:#fff0f0;color:var(--debit);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600">IDOR</span>
+            <span style="background:#fff0f0;color:var(--debit);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600">Missing Auth Check</span>
+            <span style="background:#fff0f0;color:var(--debit);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600">Data Exposure</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="/lab3" style="text-decoration:none">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px;transition:box-shadow .15s;cursor:pointer" onmouseover="this.style.boxShadow='0 4px 16px rgba(0,0,0,.1)'" onmouseout="this.style.boxShadow=''">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <div style="background:#fff0f0;color:var(--debit);font-size:20px;width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center">🔓</div>
+            <div>
+              <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3)">Lab 3</div>
+              <div style="font-size:15px;font-weight:700;color:var(--text1)">Account Takeover via JWT</div>
+            </div>
+          </div>
+          <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:14px">Forge JWT tokens three ways: alg:none attack, weak-secret HS256 forgery, and exploiting disabled signature verification to impersonate any user.</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span style="background:#fff0f0;color:var(--debit);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600">JWT Forgery</span>
+            <span style="background:#fff0f0;color:var(--debit);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600">alg:none</span>
+            <span style="background:#fff0f0;color:var(--debit);border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600">Weak Secret</span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+  </div>
+</section>
+
+<!-- Security strip -->
+<div style="background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:20px 24px">
+  <div style="max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:40px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)">
+      <span style="font-size:20px">🔐</span> 256-bit SSL encryption
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)">
+      <span style="font-size:20px">🛡️</span> DICGC insured deposits
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)">
+      <span style="font-size:20px">🏛️</span> RBI regulated
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2)">
+      <span style="font-size:20px">⚡</span> 99.9% uptime SLA
+    </div>
+  </div>
+</div>
+
+{% endblock %}

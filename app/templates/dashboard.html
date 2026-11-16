@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — NexBank NetBanking{% endblock %}
+{% block content %}
+
+<div class="page-header">
+  <div class="page-header-inner">
+    <div class="page-breadcrumb">NetBanking / <span style="color:#fff">Dashboard</span></div>
+    <h2 id="welcome-msg">Welcome back</h2>
+  </div>
+</div>
+
+<div class="page-content">
+
+  <!-- Stat chips -->
+  <div class="stats-row" id="stats-row">
+    <div class="stat-chip">
+      <div class="stat-icon blue">💳</div>
+      <div>
+        <div class="stat-label">Total Accounts</div>
+        <div class="stat-value" id="stat-accounts">—</div>
+      </div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-icon green">💰</div>
+      <div>
+        <div class="stat-label">Total Balance</div>
+        <div class="stat-value" id="stat-balance">—</div>
+      </div>
+    </div>
+    <div class="stat-chip">
+      <div class="stat-icon orange">📤</div>
+      <div>
+        <div class="stat-label">Last Transaction</div>
+        <div class="stat-value" id="stat-last-txn">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account cards + recent activity -->
+  <div class="dash-grid">
+
+    <div class="dash-main">
+
+      <!-- My Accounts -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">My Accounts</div>
+            <div class="card-subtitle">All linked accounts</div>
+          </div>
+          <a href="/transfer" class="btn btn-primary btn-sm">Transfer Funds</a>
+        </div>
+        <div class="card-body">
+          <div class="accounts-row" id="accounts-container">
+            <div class="acct-card savings" style="opacity:.4">
+              <div class="acct-type-label">Loading…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Recent Transactions</div>
+            <div class="card-subtitle">Last 5 transactions across all accounts</div>
+          </div>
+          <a href="/transactions" class="btn btn-ghost btn-sm">View All →</a>
+        </div>
+        <div class="txn-list" id="recent-txns">
+          <div style="padding:28px;text-align:center;color:var(--text3);font-size:13px">Loading transactions…</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="dash-side">
+
+      <!-- Quick Actions -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">Quick Actions</div></div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+          <a href="/transfer" class="btn btn-outline" style="justify-content:flex-start;gap:10px"><span>💸</span> Fund Transfer</a>
+          <a href="/transactions" class="btn btn-outline" style="justify-content:flex-start;gap:10px"><span>📄</span> Account Statement</a>
+          <a href="/profile" class="btn btn-outline" style="justify-content:flex-start;gap:10px"><span>👤</span> Profile &amp; KYC</a>
+          <a href="/forgot-password" class="btn btn-outline" style="justify-content:flex-start;gap:10px"><span>🔑</span> Change Password</a>
+        </div>
+      </div>
+
+      <!-- Account Summary -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">Account Summary</div></div>
+        <div class="card-body" id="account-summary">
+          <div style="color:var(--text3);font-size:13px">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Important Notice -->
+      <div class="card" style="border-left:4px solid var(--accent)">
+        <div class="card-body" style="padding:16px">
+          <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">⚠️ Security Reminder</div>
+          <p style="font-size:12.5px;color:var(--text2);line-height:1.7">
+            NexBank will <strong>never</strong> ask for your full password, OTP or card details over phone, SMS or email. Do not share login credentials with anyone.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var tok = getToken();
+  if (!tok) { window.location = '/login'; return; }
+  var pl = decodeJWT(tok);
+  if (pl) {
+    var hour = new Date().getHours();
+    var greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('welcome-msg').textContent = greet + ', ' + pl.name;
+  }
+  loadAccounts();
+  loadRecentTxns();
+});
+
+function loadAccounts() {
+  fetch('/api/account/my-accounts', { headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var c = document.getElementById('accounts-container');
+      if (!data.accounts || !data.accounts.length) {
+        c.innerHTML = '<p style="color:var(--text3);font-size:13px">No accounts found.</p>';
+        return;
+      }
+      var total = 0;
+      c.innerHTML = data.accounts.map(function(a) {
+        total += a.balance;
+        var cls = a.account_type === 'current' ? 'current' : a.account_type === 'salary' ? 'salary' : 'savings';
+        var masked = a.account_number.replace(/^(\w{3})(.+)(\w{4})$/, '$1 XXXX XXXX $3');
+        return '<div class="acct-card ' + cls + '">' +
+          '<div class="acct-type-label">' + a.account_type.toUpperCase() + ' ACCOUNT</div>' +
+          '<div class="acct-number">' + masked + '</div>' +
+          '<div class="acct-balance">₹ ' + a.balance.toLocaleString('en-IN', {minimumFractionDigits:2}) + '</div>' +
+          '<div class="acct-bal-label">Available Balance</div>' +
+          '<div class="acct-ifsc">' + (a.ifsc_code || 'NXBK0000001') + '</div>' +
+          '</div>';
+      }).join('');
+
+      document.getElementById('stat-accounts').textContent = data.accounts.length;
+      document.getElementById('stat-balance').textContent  = '₹' + total.toLocaleString('en-IN', {maximumFractionDigits:0});
+
+      var sumHtml = data.accounts.map(function(a) {
+        return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border-lt);font-size:13px">' +
+          '<span style="color:var(--text2)">' + a.account_type.charAt(0).toUpperCase() + a.account_type.slice(1) + '</span>' +
+          '<span style="font-weight:700">₹ ' + a.balance.toLocaleString('en-IN', {minimumFractionDigits:2}) + '</span>' +
+          '</div>';
+      }).join('') +
+        '<div style="display:flex;justify-content:space-between;padding:10px 0;font-size:13px;font-weight:700">' +
+        '<span>Total</span><span style="color:var(--primary)">₹ ' + total.toLocaleString('en-IN', {minimumFractionDigits:2}) + '</span></div>';
+      document.getElementById('account-summary').innerHTML = sumHtml;
+    });
+}
+
+function loadRecentTxns() {
+  fetch('/api/txn/all', { headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var el = document.getElementById('recent-txns');
+      if (!data.transactions || !data.transactions.length) {
+        el.innerHTML = '<div style="padding:28px;text-align:center;color:var(--text3);font-size:13px">No transactions found.</div>';
+        return;
+      }
+      var txns = data.transactions.slice(0, 5);
+      var icons = ['🛒','💸','🏠','📱','🍽️','✈️','💊','🎓'];
+      // Lab 9: Stored XSS — t.description comes straight from the attacker-
+      // controlled transfer payload (routes/txn.py transfer()) and is
+      // concatenated into innerHTML with no escaping. Fires immediately on
+      // dashboard load for whoever receives a transfer with a malicious
+      // description, right after login while their JWT is freshest.
+      el.innerHTML = txns.map(function(t, i) {
+        var isDebit  = t.from_account_id !== null;
+        var cls      = isDebit ? 'debit' : 'credit';
+        var sign     = isDebit ? '−' : '+';
+        var icon     = icons[i % icons.length];
+        var dateStr  = t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+        return '<div class="txn-row">' +
+          '<div class="txn-icon ' + cls + '">' + icon + '</div>' +
+          '<div class="txn-details">' +
+            '<div class="txn-desc">' + (t.description || 'Transfer') + '</div>' +
+            '<div class="txn-meta">' + dateStr + ' &nbsp;·&nbsp; <span class="txn-id-pill">' + t.txn_id + '</span></div>' +
+          '</div>' +
+          '<div class="txn-amount">' +
+            '<div class="amount ' + cls + '">' + sign + ' ₹' + parseFloat(t.amount).toLocaleString('en-IN', {minimumFractionDigits:2}) + '</div>' +
+            '<div class="balance"><span class="txn-status-badge badge-completed">Completed</span></div>' +
+          '</div>' +
+          '</div>';
+      }).join('');
+
+      var last = txns[0];
+      if (last) document.getElementById('stat-last-txn').textContent = '₹' + parseFloat(last.amount).toLocaleString('en-IN', {maximumFractionDigits:0});
+    });
+}
+</script>
+{% endblock %}
